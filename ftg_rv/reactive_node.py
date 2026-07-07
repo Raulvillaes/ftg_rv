@@ -27,6 +27,8 @@ class ReactiveNode(Node):
         self.declare_parameter('corner_speed', 1.5)
         self.declare_parameter('steering_threshold_low', 10.0)
         self.declare_parameter('steering_threshold_high', 20.0)
+        self.declare_parameter('brake_distance', 4.0)
+        self.declare_parameter('full_speed_distance', 7.0)
         self.declare_parameter('fov_angle', 90.0)
         self.declare_parameter('smoothing_window', 5)
         self.declare_parameter('max_range', 10.0)
@@ -42,6 +44,8 @@ class ReactiveNode(Node):
         self.corner_speed = p('corner_speed').value
         self.steer_low = np.radians(p('steering_threshold_low').value)
         self.steer_high = np.radians(p('steering_threshold_high').value)
+        self.brake_distance = p('brake_distance').value
+        self.full_speed_distance = p('full_speed_distance').value
         self.fov_angle = np.radians(p('fov_angle').value)
         self.smoothing_window = p('smoothing_window').value
         self.max_range = p('max_range').value
@@ -91,6 +95,12 @@ class ReactiveNode(Node):
 
         proc_ranges = self.preprocess_lidar(scan)
 
+        # Espacio libre directamente al frente (media de los rayos centrales,
+        # ANTES de la burbuja para que esta no lo anule). Gobierna el frenado
+        # al acercarse a una curva aunque el volante siga recto.
+        center = len(proc_ranges) // 2
+        forward_clearance = float(np.mean(proc_ranges[center - 5:center + 6]))
+
         # Burbuja de seguridad: anula un radio fisico alrededor del punto
         # mas cercano para que el auto lo esquive en vez de rozarlo.
         closest_idx = int(np.argmin(proc_ranges))
@@ -109,7 +119,7 @@ class ReactiveNode(Node):
 
         best_idx = self.find_best_point(gap[0], gap[1], proc_ranges)
         steering_angle = self.index_to_angle(best_idx, scan)
-        speed = self.speed_from_steering(steering_angle)
+        speed = self.compute_speed(steering_angle, forward_clearance)
         self.publish_drive(steering_angle, speed)
 
     # ------------------------------------------------------------------
@@ -189,9 +199,17 @@ class ReactiveNode(Node):
         Mezcla el punto mas lejano (rapido, apura las curvas) con el centro
         del gap (seguro, se aleja de las paredes) segun best_point_bias:
         0.0 = solo el mas lejano, 1.0 = solo el centro.
+
+        En rectas largas muchos rayos saturan a max_range y empatan como
+        "mas lejano"; argmax devolveria el primero (el borde del empate) y
+        el auto zigzaguearia. Entre los empatados se elige el mas cercano
+        al centro del gap para apuntar de frente.
         """
-        furthest_idx = start_i + int(np.argmax(ranges[start_i:end_i + 1]))
+        window = ranges[start_i:end_i + 1]
         center_idx = (start_i + end_i) // 2
+        # Candidatos: rayos practicamente empatados con el maximo (98%).
+        candidates = np.where(window >= 0.98 * np.max(window))[0] + start_i
+        furthest_idx = int(candidates[np.argmin(np.abs(candidates - center_idx))])
         bias = self.best_point_bias
         return int(round((1.0 - bias) * furthest_idx + bias * center_idx))
 
@@ -199,14 +217,31 @@ class ReactiveNode(Node):
         """Convierte un indice del array recortado al angulo real del rayo."""
         return scan.angle_min + (self.fov_start + idx) * scan.angle_increment
 
-    def speed_from_steering(self, steering_angle):
-        """Velocidad escalonada: cuanto mas girado el volante, mas despacio."""
+    def compute_speed(self, steering_angle, forward_clearance):
+        """Velocidad = minimo entre dos criterios independientes.
+
+        1. Por angulo de volante: cuanto mas girado, mas despacio.
+        2. Por espacio libre al frente: lineal entre corner_speed (a
+           brake_distance o menos) y max_speed (a full_speed_distance o
+           mas). Sin esto el auto acelera en el vertice de la curva (volante
+           momentaneamente recto hacia la salida) y no frena al final de
+           las rectas.
+        """
         abs_steer = abs(steering_angle)
         if abs_steer < self.steer_low:
-            return self.max_speed
-        if abs_steer < self.steer_high:
-            return self.mid_speed
-        return self.corner_speed
+            speed_steer = self.max_speed
+        elif abs_steer < self.steer_high:
+            speed_steer = self.mid_speed
+        else:
+            speed_steer = self.corner_speed
+
+        frac = (forward_clearance - self.brake_distance) \
+            / (self.full_speed_distance - self.brake_distance)
+        frac = float(np.clip(frac, 0.0, 1.0))
+        speed_clearance = self.corner_speed \
+            + frac * (self.max_speed - self.corner_speed)
+
+        return min(speed_steer, speed_clearance)
 
     def odom_callback(self, odom):
         """Cuenta vueltas y cronometra usando la posicion del auto.

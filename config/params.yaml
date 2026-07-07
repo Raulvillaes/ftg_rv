@@ -1,11 +1,15 @@
 reactive_node:
   ros__parameters:
     # ---------- Velocidad ----------
-    max_speed: 5.0              # m/s en recta (dirección casi nula)
-    mid_speed: 3.0              # m/s en curvas suaves
-    corner_speed: 1.5           # m/s en curvas cerradas
+    max_speed: 10.0              # m/s en recta (dirección casi nula)
+    mid_speed: 6.0              # m/s en curvas suaves
+    corner_speed: 3.0           # m/s en curvas cerradas
     steering_threshold_low: 10.0   # grados: por debajo -> max_speed
     steering_threshold_high: 20.0  # grados: por encima -> corner_speed
+    brake_distance: 2.5         # m: con menos espacio libre al frente se va a
+                                # corner_speed aunque el volante este recto
+    full_speed_distance: 7.0    # m: espacio libre al frente que permite max_speed;
+                                # frenar de 10 a 3 m/s toma ~4.8 m en el simulador
 
     # ---------- Follow the Gap ----------
     fov_angle: 90.0             # grados a cada lado del frente (FOV util = +-90)
@@ -13,7 +17,7 @@ reactive_node:
     max_range: 10.0             # m: saturacion de distancias del LiDAR
     gap_threshold: 2.0          # m: distancia minima para considerar un rayo "libre"
     bubble_radius: 0.4          # m: radio de la burbuja de seguridad
-    best_point_bias: 0.5        # 0.0 = punto mas lejano del gap, 1.0 = centro del gap
+    best_point_bias: 0.4        # 0.0 = punto mas lejano del gap, 1.0 = centro del gap
 
     # ---------- Vueltas y cronometro ----------
     finish_line_tolerance: 4.0  # m: radio alrededor de la posicion inicial (meta);
