@@ -16,5 +16,6 @@ reactive_node:
     best_point_bias: 0.5        # 0.0 = punto mas lejano del gap, 1.0 = centro del gap
 
     # ---------- Vueltas y cronometro ----------
-    finish_line_tolerance: 1.0  # m: radio alrededor de la posicion inicial (meta)
+    finish_line_tolerance: 4.0  # m: radio alrededor de la posicion inicial (meta);
+                                # la linea de carrera puede pasar a ~3 m del spawn
     min_lap_time: 10.0          # s: tiempo minimo entre cruces (anti doble conteo)
