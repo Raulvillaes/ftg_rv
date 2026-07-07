@@ -32,6 +32,7 @@ class ReactiveNode(Node):
         self.declare_parameter('max_range', 10.0)
         self.declare_parameter('gap_threshold', 2.0)
         self.declare_parameter('bubble_radius', 0.4)
+        self.declare_parameter('best_point_bias', 0.5)
         self.declare_parameter('finish_line_tolerance', 1.0)
         self.declare_parameter('min_lap_time', 10.0)
 
@@ -46,8 +47,14 @@ class ReactiveNode(Node):
         self.max_range = p('max_range').value
         self.gap_threshold = p('gap_threshold').value
         self.bubble_radius = p('bubble_radius').value
+        self.best_point_bias = p('best_point_bias').value
         self.finish_line_tolerance = p('finish_line_tolerance').value
         self.min_lap_time = p('min_lap_time').value
+
+        # Indices del recorte de FOV; se calculan con el primer scan recibido
+        # (dependen de angle_min/angle_increment, que no conocemos hasta ahi).
+        self.fov_start = None
+        self.fov_end = None
 
         # ---------- Comunicacion ----------
         self.scan_sub = self.create_subscription(
@@ -64,10 +71,133 @@ class ReactiveNode(Node):
     # Callbacks
     # ------------------------------------------------------------------
     def lidar_callback(self, scan):
-        """Procesa cada scan del LiDAR y publica el comando de conduccion."""
-        # Version minima (Bloque 1): avanzar recto y lento para validar la
-        # tuberia scan -> nodo -> drive. El algoritmo llega en el Bloque 2.
-        self.publish_drive(steering_angle=0.0, speed=1.0)
+        """Procesa cada scan del LiDAR con Follow the Gap y publica /drive.
+
+        Pipeline: recorte de FOV -> limpieza y suavizado -> burbuja de
+        seguridad sobre el punto mas cercano -> gap libre mas largo ->
+        mejor punto del gap -> angulo de direccion + velocidad.
+        """
+        if self.fov_start is None:
+            self._compute_fov_indices(scan)
+
+        proc_ranges = self.preprocess_lidar(scan)
+
+        # Burbuja de seguridad: anula un radio fisico alrededor del punto
+        # mas cercano para que el auto lo esquive en vez de rozarlo.
+        closest_idx = int(np.argmin(proc_ranges))
+        closest_dist = proc_ranges[closest_idx]
+        proc_ranges = self.apply_safety_bubble(
+            proc_ranges, closest_idx, closest_dist, scan.angle_increment)
+
+        gap = self.find_max_gap(proc_ranges)
+        if gap is None:
+            # Sin gap libre: emergencia. Apuntar al rayo mas largo que quede
+            # e ir a velocidad de curva para no empotrarse.
+            best_idx = int(np.argmax(proc_ranges))
+            steering_angle = self.index_to_angle(best_idx, scan)
+            self.publish_drive(steering_angle, self.corner_speed)
+            return
+
+        best_idx = self.find_best_point(gap[0], gap[1], proc_ranges)
+        steering_angle = self.index_to_angle(best_idx, scan)
+        speed = self.speed_from_steering(steering_angle)
+        self.publish_drive(steering_angle, speed)
+
+    # ------------------------------------------------------------------
+    # Follow the Gap
+    # ------------------------------------------------------------------
+    def _compute_fov_indices(self, scan):
+        """Calcula (una sola vez) los indices que recortan el scan a +-fov_angle.
+
+        El LiDAR del simulador cubre ~270 grados; lo que queda detras de los
+        hombros del auto no sirve para decidir hacia donde avanzar y ademas
+        puede confundir al algoritmo (gaps detras del auto).
+        """
+        n = int(round((scan.angle_max - scan.angle_min) / scan.angle_increment)) + 1
+        center = n // 2  # rayo que apunta al frente (angulo 0)
+        half_fov_rays = int(self.fov_angle / scan.angle_increment)
+        self.fov_start = max(0, center - half_fov_rays)
+        self.fov_end = min(n - 1, center + half_fov_rays)
+        self.get_logger().info(
+            f'FOV recortado a rayos [{self.fov_start}, {self.fov_end}] '
+            f'de {n} (+-{np.degrees(self.fov_angle):.0f} grados)')
+
+    def preprocess_lidar(self, scan):
+        """Limpia y suaviza el scan ya recortado al FOV util.
+
+        1. Recorta a [fov_start, fov_end].
+        2. NaN/inf -> 0 (lecturas invalidas se tratan como obstaculo).
+        3. Satura a max_range: una lectura de 30 m no debe dominar la
+           eleccion del mejor punto.
+        4. Media movil para eliminar ruido puntual del sensor.
+        """
+        ranges = np.array(scan.ranges[self.fov_start:self.fov_end + 1],
+                          dtype=np.float64)
+        ranges = np.nan_to_num(ranges, nan=0.0, posinf=self.max_range,
+                               neginf=0.0)
+        ranges = np.clip(ranges, 0.0, self.max_range)
+        window = int(self.smoothing_window)
+        if window > 1:
+            kernel = np.ones(window) / window
+            ranges = np.convolve(ranges, kernel, mode='same')
+        return ranges
+
+    def apply_safety_bubble(self, ranges, center_idx, center_dist, angle_inc):
+        """Pone a cero los rayos dentro de bubble_radius metros del punto
+        mas cercano.
+
+        El radio fisico se convierte a numero de rayos con el angulo que
+        subtiende la burbuja a esa distancia: cuanto mas cerca el obstaculo,
+        mas rayos ocupa la misma burbuja.
+        """
+        if center_dist <= 0.0:
+            bubble_rays = int(np.radians(5.0) / angle_inc)  # minimo razonable
+        else:
+            bubble_rays = int(np.arctan2(self.bubble_radius, center_dist)
+                              / angle_inc)
+        lo = max(0, center_idx - bubble_rays)
+        hi = min(len(ranges) - 1, center_idx + bubble_rays)
+        ranges[lo:hi + 1] = 0.0
+        return ranges
+
+    def find_max_gap(self, ranges):
+        """Devuelve (inicio, fin) de la secuencia contigua mas larga de rayos
+        "libres" (distancia > gap_threshold), o None si no hay ninguno.
+        """
+        free = ranges > self.gap_threshold
+        if not np.any(free):
+            return None
+        # Bordes de las rachas de True: diff sobre el array con centinelas.
+        edges = np.diff(np.concatenate(([0], free.astype(int), [0])))
+        starts = np.where(edges == 1)[0]
+        ends = np.where(edges == -1)[0] - 1
+        longest = int(np.argmax(ends - starts))
+        return int(starts[longest]), int(ends[longest])
+
+    def find_best_point(self, start_i, end_i, ranges):
+        """Elige el punto objetivo dentro del gap.
+
+        Mezcla el punto mas lejano (rapido, apura las curvas) con el centro
+        del gap (seguro, se aleja de las paredes) segun best_point_bias:
+        0.0 = solo el mas lejano, 1.0 = solo el centro.
+        """
+        furthest_idx = start_i + int(np.argmax(ranges[start_i:end_i + 1]))
+        center_idx = (start_i + end_i) // 2
+        bias = self.best_point_bias
+        return int(round((1.0 - bias) * furthest_idx + bias * center_idx))
+
+    def index_to_angle(self, idx, scan):
+        """Convierte un indice del array recortado al angulo real del rayo."""
+        return scan.angle_min + (self.fov_start + idx) * scan.angle_increment
+
+    def speed_from_steering(self, steering_angle):
+        """Velocidad escalonada: cuanto mas girado el volante, mas despacio."""
+        abs_steer = abs(steering_angle)
+        if abs_steer < self.steer_low:
+            return self.max_speed
+        if abs_steer < self.steer_high:
+            return self.mid_speed
+        return self.corner_speed
 
     def odom_callback(self, odom):
         """Recibe la odometria; aqui viviran las vueltas y el cronometro."""
@@ -78,6 +208,8 @@ class ReactiveNode(Node):
     # ------------------------------------------------------------------
     def publish_drive(self, steering_angle, speed):
         """Publica un AckermannDriveStamped con el angulo y velocidad dados."""
+        # El servo de direccion del F1Tenth satura en ~0.42 rad (24 grados).
+        steering_angle = float(np.clip(steering_angle, -0.42, 0.42))
         msg = AckermannDriveStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.header.frame_id = 'base_link'
