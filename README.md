@@ -174,6 +174,7 @@ vuelta** de forma estable y sin colisiones.
    (el launch lee el `sim.yaml` instalado, no el de `src/`):
 
    ```bash
+   source /opt/ros/humble/setup.bash
    cd ~/F1Tenth-Repository
    colcon build --packages-select f1tenth_gym_ros
    ```
@@ -181,6 +182,7 @@ vuelta** de forma estable y sin colisiones.
 ### 4.2 Instalar este paquete
 
 ```bash
+source /opt/ros/humble/setup.bash
 cd ~/F1Tenth-Repository/src
 git clone https://github.com/Raulvillaes/ftg_rv.git ftg_rv
 cd ~/F1Tenth-Repository
@@ -193,6 +195,7 @@ source install/setup.bash
 Terminal 1 — simulador:
 
 ```bash
+source /opt/ros/humble/setup.bash
 cd ~/F1Tenth-Repository && source install/setup.bash
 ros2 launch f1tenth_gym_ros gym_bridge_launch.py
 ```
@@ -211,6 +214,7 @@ ros2 launch f1tenth_gym_ros gym_bridge_launch.py
 Terminal 2 — controlador:
 
 ```bash
+source /opt/ros/humble/setup.bash
 cd ~/F1Tenth-Repository && source install/setup.bash
 ros2 launch ftg_rv controller.launch.py
 ```
