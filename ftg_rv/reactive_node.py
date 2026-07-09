@@ -23,19 +23,19 @@ class ReactiveNode(Node):
 
         # ---------- Parametros (ver config/params.yaml) ----------
         self.declare_parameter('max_speed', 10.0)
-        self.declare_parameter('mid_speed', 3.0)
+        self.declare_parameter('mid_speed', 6.0)
         self.declare_parameter('corner_speed', 1.5)
         self.declare_parameter('steering_threshold_low', 10.0)
         self.declare_parameter('steering_threshold_high', 20.0)
-        self.declare_parameter('brake_distance', 4.0)
+        self.declare_parameter('brake_distance', 2.5)
         self.declare_parameter('full_speed_distance', 7.0)
         self.declare_parameter('fov_angle', 90.0)
         self.declare_parameter('smoothing_window', 5)
         self.declare_parameter('max_range', 10.0)
         self.declare_parameter('gap_threshold', 2.0)
         self.declare_parameter('bubble_radius', 0.4)
-        self.declare_parameter('best_point_bias', 0.5)
-        self.declare_parameter('finish_line_tolerance', 1.0)
+        self.declare_parameter('best_point_bias', 0.4)
+        self.declare_parameter('finish_line_tolerance', 4.0)
         self.declare_parameter('min_lap_time', 10.0)
 
         p = self.get_parameter
@@ -141,7 +141,7 @@ class ReactiveNode(Node):
             f'FOV recortado a rayos [{self.fov_start}, {self.fov_end}] '
             f'de {n} (+-{np.degrees(self.fov_angle):.0f} grados)')
 
-    def preprocess_lidar(self, msg: LaserScan):
+    def preprocess_lidar(self, msg: LaserScan) -> np.ndarray:
         """Limpia y suaviza el msg ya recortado al FOV util.
 
         1. Recorta a [fov_start, fov_end].
@@ -161,7 +161,7 @@ class ReactiveNode(Node):
             ranges = np.convolve(ranges, kernel, mode='same')
         return ranges
 
-    def apply_safety_bubble(self, ranges, center_idx, center_dist, angle_inc):
+    def apply_safety_bubble(self, ranges, center_idx, center_dist, angle_inc) -> np.ndarray:
         """Pone a cero los rayos dentro de bubble_radius metros del punto
         mas cercano.
 
@@ -179,7 +179,7 @@ class ReactiveNode(Node):
         ranges[lo:hi + 1] = 0.0
         return ranges
 
-    def find_max_gap(self, ranges):
+    def find_max_gap(self, ranges) -> tuple:
         """Devuelve (inicio, fin) de la secuencia contigua mas larga de rayos
         "libres" (distancia > gap_threshold), o None si no hay ninguno.
         """
@@ -193,7 +193,7 @@ class ReactiveNode(Node):
         longest = int(np.argmax(ends - starts))
         return int(starts[longest]), int(ends[longest])
 
-    def find_best_point(self, start_i, end_i, ranges):
+    def find_best_point(self, start_i, end_i, ranges) -> int:
         """Elige el punto objetivo dentro del gap.
 
         Mezcla el punto mas lejano (rapido, apura las curvas) con el centro
@@ -209,23 +209,24 @@ class ReactiveNode(Node):
         center_idx = (start_i + end_i) // 2
         # Candidatos: rayos practicamente empatados con el maximo (98%).
         candidates = np.where(window >= 0.98 * np.max(window))[0] + start_i
+
+        #menos alejado del centro del gap (para no zigzaguear en rectas largas)
         furthest_idx = int(candidates[np.argmin(np.abs(candidates - center_idx))])
+
         bias = self.best_point_bias
         return int(round((1.0 - bias) * furthest_idx + bias * center_idx))
 
-    def index_to_angle(self, idx, msg: LaserScan):
+    def index_to_angle(self, idx, msg: LaserScan) -> float:
         """Convierte un indice del array recortado al angulo real del rayo."""
         return msg.angle_min + (self.fov_start + idx) * msg.angle_increment
 
-    def compute_speed(self, steering_angle, forward_clearance):
+    def compute_speed(self, steering_angle, forward_clearance) -> float:
         """Velocidad = minimo entre dos criterios independientes.
 
         1. Por angulo de volante: cuanto mas girado, mas despacio.
         2. Por espacio libre al frente: lineal entre corner_speed (a
            brake_distance o menos) y max_speed (a full_speed_distance o
-           mas). Sin esto el auto acelera en el vertice de la curva (volante
-           momentaneamente recto hacia la salida) y no frena al final de
-           las rectas.
+           mas).
         """
         abs_steer = abs(steering_angle)
         if abs_steer < self.steer_low:
@@ -243,7 +244,7 @@ class ReactiveNode(Node):
 
         return min(speed_steer, speed_clearance)
 
-    def odom_callback(self, odom):
+    def odom_callback(self, msg: Odometry):
         """Cuenta vueltas y cronometra usando la posicion del auto.
 
         La meta es la posicion del PRIMER mensaje de odometria (donde aparece
@@ -253,8 +254,8 @@ class ReactiveNode(Node):
           - Histeresis: primero debe salir del circulo (lap_armed).
           - Tiempo minimo de vuelta (min_lap_time).
         """
-        x = odom.pose.pose.position.x
-        y = odom.pose.pose.position.y
+        x = msg.pose.pose.position.x
+        y = msg.pose.pose.position.y
         now = self.get_clock().now()
 
         # Primer mensaje: fijar la meta y arrancar el cronometro.
