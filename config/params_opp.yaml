@@ -1,0 +1,30 @@
+# Tuning del OPONENTE (Parte 2 con vehiculo movil): el mismo controlador
+# Follow the Gap que el ego, pero con velocidades menores para que actue como
+# trafico movil que el ego debe alcanzar y esquivar. El resto de valores se
+# mantiene igual que params_obs.yaml: tambien tiene que sobrevivir a los
+# obstaculos fijos.
+# La clave raiz es el NOMBRE del nodo oponente (opp_reactive_node), que se
+# lanza remapeado a /opp_scan, /opp_racecar/odom y /opp_drive.
+opp_reactive_node:
+  ros__parameters:
+    # ---------- Velocidad ----------
+    max_speed: 6.0              # m/s en recta (ego: 10.0)
+    mid_speed: 4.5              # m/s en curvas suaves (ego: 6.5)
+    corner_speed: 3.0           # m/s en curvas cerradas (ego: 4.0)
+    steering_threshold_low: 10.0   # grados: por debajo -> max_speed
+    steering_threshold_high: 17.5  # grados: por encima -> corner_speed
+    brake_distance: 5.0         # m: con menos espacio libre al frente se va a
+                                # corner_speed aunque el volante este recto
+    full_speed_distance: 8.0    # m: espacio libre al frente que permite max_speed
+
+    # ---------- Follow the Gap ----------
+    fov_angle: 90.0             # grados a cada lado del frente (FOV util = +-90)
+    smoothing_window: 5         # rayos de la media movil (suavizado del scan)
+    max_range: 10.0             # m: saturacion de distancias del LiDAR
+    gap_threshold: 2.0          # m: distancia minima para considerar un rayo "libre"
+    bubble_radius: 0.4          # m: radio de la burbuja de seguridad
+    best_point_bias: 0.3        # 0.0 = punto mas lejano del gap, 1.0 = centro del gap
+
+    # ---------- Vueltas y cronometro ----------
+    finish_line_tolerance: 4.0  # m: radio alrededor de la posicion inicial (meta)
+    min_lap_time: 10.0          # s: tiempo minimo entre cruces (anti doble conteo)
