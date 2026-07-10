@@ -20,8 +20,13 @@ mapa y su propio tuning:
 
 ### 1.1 Prerrequisitos
 
-- ROS 2 Humble y el workspace del curso (`F1Tenth-Repository`) con el
-  simulador `f1tenth_gym_ros` ya compilado y funcionando.
+- **ROS 2 Humble**: instalado siguiendo la
+  [guía de instalación oficial](https://docs.ros.org/en/humble/Installation.html)
+  (en Ubuntu 22.04, la vía recomendada es la de
+  [paquetes deb](https://docs.ros.org/en/humble/Installation/Ubuntu-Install-Debs.html)).
+- **Workspace del curso**: [F1Tenth-Repository](https://github.com/widegonz/F1Tenth-Repository)
+  clonado en `~/F1Tenth-Repository`, con el simulador `f1tenth_gym_ros` ya
+  compilado y funcionando (ver las instrucciones de su propio README).
 
 ### 1.2 Instalar este paquete
 
