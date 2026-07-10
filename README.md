@@ -63,6 +63,18 @@ su tiempo y el acumulado:
 ============================================
 ```
 
+Al completar `total_laps` (10 por defecto) se imprime la mejor vuelta y el
+propio `launch` se cierra solo (simulador, RViz y controlador(es)), sin
+necesidad de Ctrl+C:
+
+```
+##############################################
+  10 VUELTAS COMPLETADAS - FIN DE LA PRUEBA
+  Mejor vuelta:          38.70 s
+  Tiempo total:         412.30 s
+##############################################
+```
+
 ### 2.1 Parte 1: pista limpia
 
 Un solo comando levanta el simulador con el mapa SaoPaulo limpio y el
@@ -219,6 +231,14 @@ Toda la lógica vive en `odom_callback`:
     de 10 s se ignoran.
 - **Cronómetro**: usa `self.get_clock().now()` (reloj de ROS). Al completar
   cada vuelta se imprime en consola el bloque mostrado en la sección 2.
+- **Fin de la prueba**: al llegar a `total_laps` vueltas se imprime la mejor
+  vuelta y se llama a `rclpy.shutdown()`, lo que termina el proceso de
+  `lap_timer_node`. Los tres launch (`controller*.launch.py`) registran un
+  `RegisterEventHandler(OnProcessExit(...))` sobre ese nodo que, al detectar
+  su salida, emite un evento `Shutdown()` propagado a todo el árbol de
+  lanzamiento (simulador, RViz, `reactive_node` y, en la Parte 2 con
+  oponente, también `opp_reactive_node`). Así el comando `ros2 launch` entero
+  termina solo, sin Ctrl+C manual.
 
 ## 6. Estructura del código
 
@@ -260,7 +280,7 @@ ftg_rv/
 
 | Función | Qué hace |
 |---|---|
-| `odom_callback` | Fija la meta, cuenta vueltas (histéresis + tiempo mínimo) e imprime el cronómetro |
+| `odom_callback` | Fija la meta, cuenta vueltas (histéresis + tiempo mínimo), imprime el cronómetro y, al llegar a `total_laps`, imprime la mejor vuelta y cierra el nodo (`rclpy.shutdown()`) |
 
 ## 7. Mapas
 
@@ -340,6 +360,7 @@ lleva este nodo (sección 5):
 |---|---|---|
 | `finish_line_tolerance` | 4.0 m | Radio de detección de la meta |
 | `min_lap_time` | 10.0 s | Tiempo mínimo entre cruces de meta |
+| `total_laps` | 10 | Vueltas antes de imprimir la mejor y cerrar el `launch` completo |
 
 Lógica del tuning de cada parte:
 

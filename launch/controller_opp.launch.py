@@ -23,7 +23,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import EmitEvent, IncludeLaunchDescription, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.events import Shutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.actions import Node
 
@@ -74,5 +76,16 @@ def generate_launch_description():
         emulate_tty=True,
     )
 
+    # Al completar total_laps, ego_lap_timer_node imprime la mejor vuelta y
+    # se cierra solo (rclpy.shutdown()); este manejador detecta esa salida y
+    # apaga el resto (simulador, ego y oponente) con el mismo evento. El
+    # oponente no cuenta vueltas, asi que no dispara el cierre por si solo.
+    shutdown_on_laps_done = RegisterEventHandler(OnProcessExit(
+        target_action=ego_lap_timer_node,
+        on_exit=[EmitEvent(event=Shutdown(
+            reason='10 vueltas completadas'))],
+    ))
+
     return LaunchDescription(
-        [sim_obs, ego_node, ego_lap_timer_node, opp_node])
+        [sim_obs, ego_node, ego_lap_timer_node, opp_node,
+         shutdown_on_laps_done])

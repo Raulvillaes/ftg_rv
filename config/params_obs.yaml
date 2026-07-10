@@ -28,3 +28,4 @@ lap_timer_node:
     finish_line_tolerance: 4.0  # m: radio alrededor de la posicion inicial (meta);
                                 # la linea de carrera puede pasar a ~3 m del spawn
     min_lap_time: 10.0          # s: tiempo minimo entre cruces (anti doble conteo)
+    total_laps: 10              # vueltas antes de imprimir la mejor y cerrar el launch
