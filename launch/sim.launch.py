@@ -1,6 +1,6 @@
 """Launch del simulador con los mapas SaoPaulo de este paquete.
 
-El launch del profesor (gym_bridge_launch.py) lee siempre su config/sim.yaml,
+El launch del simulador (gym_bridge_launch.py) lee siempre su config/sim.yaml,
 cuyo map_path hay que editar a mano (y recompilar) para cambiar de mapa. Para
 evitar ese paso sin modificar su repo, este launch replica sus mismos nodos
 (bridge, map_server, lifecycle, RViz, robot_state_publisher) pero sobreescribe
@@ -8,7 +8,7 @@ los parametros propios de cada escenario; ambos mapas (limpio y con
 obstaculos) viajan instalados en el share de MI paquete (ftg_rv/maps/).
 
 El resto de parametros (topicos, etc.) se sigue leyendo del sim.yaml del
-profesor: unica fuente de verdad para todo lo que no depende del escenario.
+simulador: unica fuente de verdad para todo lo que no depende del escenario.
 En launch_ros, cuando un nodo recibe varias fuentes de parametros, la ultima
 gana, asi que [sim.yaml, overrides] aplica solo esos overrides.
 
@@ -56,10 +56,10 @@ def generate_launch_description():
     num_agent = LaunchConfiguration('num_agent')
     has_opp = IfCondition(PythonExpression(["'", num_agent, "' == '2'"]))
 
-    # Overrides sobre el sim.yaml del profesor (la ultima fuente gana):
+    # Overrides sobre el sim.yaml del simulador (la ultima fuente gana):
     # - map_path: el mapa pedido por argumento, instalado en este paquete.
     # - stheta: orientacion inicial del ego (argumento; en radianes).
-    # - num_agent: viene del argumento de launch (el yaml del profesor fija 1).
+    # - num_agent: viene del argumento de launch (el yaml del simulador fija 1).
     # - sx1/sy1/stheta1: pose inicial del oponente. La del sim.yaml (9.5, 8.5)
     #   es de otro mapa y en SaoPaulo cae fuera de la pista; se usa una pose
     #   sobre la linea de carrera, mas adelante que el ego. Solo tiene efecto
