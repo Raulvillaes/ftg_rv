@@ -19,6 +19,10 @@ setup(
             glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'config'),
             glob('config/*.yaml')),
+        # Mapa SaoPaulo con los obstaculos fijos (Parte 2): PNG editado con
+        # GIMP + su yaml de metadatos, juntos para que map_path los resuelva.
+        (os.path.join('share', package_name, 'maps'),
+            glob('maps/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
