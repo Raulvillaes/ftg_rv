@@ -102,10 +102,11 @@ ros2 launch ftg_rv controller_obs.launch.py
 ```
 
 No hay que tocar `sim.yaml` para alternar entre las dos partes: el launch
-`sim_obs.launch.py` sobreescribe el parámetro `map_path` del bridge y del
-`map_server` hacia el mapa instalado en el share de este paquete, y todo lo
-demás (tópicos, número de agentes, poses iniciales) se sigue leyendo del
-`sim.yaml` del simulador.
+`sim_obs.launch.py` sobreescribe los parámetros propios de este escenario —
+`map_path` del bridge y del `map_server` hacia el mapa instalado en el share
+de este paquete, y `stheta` (la orientación inicial del vehículo, girada a
+-60° para no arrancar de frente al primer obstáculo) — y todo lo demás
+(tópicos, número de agentes) se sigue leyendo del `sim.yaml` del simulador.
 
 En la consola del controlador se ve la meta fijada al arrancar y, al
 completar cada vuelta, un bloque con el número de vuelta, su tiempo y el

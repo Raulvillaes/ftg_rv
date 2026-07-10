@@ -3,17 +3,20 @@
 El launch del profesor (gym_bridge_launch.py) lee siempre su config/sim.yaml,
 cuyo map_path apunta al mapa limpio de la Parte 1. Para correr la Parte 2 sin
 modificar su repo, este launch replica sus mismos nodos (bridge, map_server,
-lifecycle, RViz, robot_state_publisher) pero sobreescribe map_path hacia el
-mapa con obstaculos instalado en el share de MI paquete (ftg_rv/maps/).
+lifecycle, RViz, robot_state_publisher) pero sobreescribe los parametros
+propios de este escenario: map_path (el mapa con obstaculos instalado en el
+share de MI paquete, ftg_rv/maps/) y stheta (orientacion inicial del ego,
+girada para no arrancar de frente al primer obstaculo).
 
-El resto de parametros (topicos, num_agent, poses iniciales, etc.) se sigue
-leyendo del sim.yaml del profesor: unica fuente de verdad para todo lo que no
-es el mapa. En launch_ros, cuando un nodo recibe varias fuentes de parametros,
-la ultima gana, asi que [sim.yaml, {'map_path': ...}] aplica solo ese override.
+El resto de parametros (topicos, num_agent, etc.) se sigue leyendo del
+sim.yaml del profesor: unica fuente de verdad para todo lo que no depende del
+escenario. En launch_ros, cuando un nodo recibe varias fuentes de parametros,
+la ultima gana, asi que [sim.yaml, overrides] aplica solo esos overrides.
 
 Uso:
     ros2 launch ftg_rv sim_obs.launch.py
 """
+import math
 import os
 
 import yaml
@@ -34,11 +37,20 @@ def generate_launch_description():
     config_dict = yaml.safe_load(open(sim_config, 'r'))
     has_opp = config_dict['bridge']['ros__parameters']['num_agent'] > 1
 
+    # Overrides sobre el sim.yaml del profesor (la ultima fuente gana):
+    # - map_path: el mapa con obstaculos de este paquete.
+    # - stheta: con los obstaculos, la orientacion inicial de la Parte 1 (0 rad)
+    #   deja el primer obstaculo de frente y el auto choca nada mas salir; se
+    #   gira el spawn para que arranque apuntando a pista libre.
+    obs_overrides = {
+        'map_path': obs_map_path,
+        'stheta': math.radians(-60.0),
+    }
     bridge_node = Node(
         package='f1tenth_gym_ros',
         executable='gym_bridge',
         name='bridge',
-        parameters=[sim_config, {'map_path': obs_map_path}],
+        parameters=[sim_config, obs_overrides],
     )
     rviz_node = Node(
         package='rviz2',
