@@ -18,6 +18,25 @@ Los tres comandos son **todo en uno** (simulador + controlador en una sola
 terminal) y los dos mapas viajan **dentro de este paquete**, no hay que
 descargar mapas ni editar la configuración del simulador.
 
+## Índice
+
+- [1. Instalación](#1-instalación)
+  - [1.1 Prerrequisitos](#11-prerrequisitos)
+  - [1.2 Instalar este paquete](#12-instalar-este-paquete)
+- [2. Ejecución](#2-ejecución)
+  - [2.1 Parte 1: pista limpia](#21-parte-1-pista-limpia)
+  - [2.2 Parte 2a: obstáculos fijos](#22-parte-2a-obstáculos-fijos)
+  - [2.3 Parte 2b: obstáculos fijos y vehículo móvil](#23-parte-2b-obstáculos-fijos-y-vehículo-móvil)
+  - [2.4 Tunear parámetros](#24-tunear-parámetros)
+- [3. Topics](#3-topics)
+- [4. Enfoque: el algoritmo Follow the Gap](#4-enfoque-el-algoritmo-follow-the-gap)
+- [5. Contador de vueltas y cronómetro](#5-contador-de-vueltas-y-cronómetro)
+- [6. Estructura del código](#6-estructura-del-código)
+- [7. Mapas](#7-mapas)
+- [8. Integración sin modificar el simulador](#8-integración-sin-modificar-el-simulador)
+- [9. Parámetros](#9-parámetros)
+- [10. Videos](#10-videos)
+
 ---
 
 ## 1. Instalación
