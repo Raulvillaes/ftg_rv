@@ -4,3 +4,9 @@ log/
 __pycache__/
 *.pyc
 *.egg-info/
+
+# Herramientas locales de analisis y tuning (no forman parte del paquete)
+ftg_rv/section_test/
+config/section_test.yaml
+launch/section_test.launch.py
+test/test_metrics.py
