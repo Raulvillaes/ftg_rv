@@ -6,10 +6,10 @@ reactive_node:
     # ---------- Velocidad ----------
     max_speed: 10.0              # m/s en recta (dirección casi nula)
     mid_speed: 6.5              # m/s en curvas suaves
-    corner_speed: 4.0           # m/s en curvas cerradas
+    corner_speed: 3.0           # m/s en curvas cerradas
     steering_threshold_low: 10.0   # grados: por debajo -> max_speed
-    steering_threshold_high: 17.5  # grados: por encima -> corner_speed
-    brake_distance: 5.0         # m: con menos espacio libre al frente se va a
+    steering_threshold_high: 20.0  # grados: por encima -> corner_speed
+    brake_distance: 4.0         # m: con menos espacio libre al frente se va a
                                 # corner_speed aunque el volante este recto
     full_speed_distance: 8.0    # m: espacio libre al frente que permite max_speed;
                                 # frenar de 10 a 3 m/s toma ~4.8 m en el simulador
