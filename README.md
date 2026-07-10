@@ -10,9 +10,13 @@ mapa y su propio tuning:
 
 | Escenario | Mapa | Parámetros | Comando |
 |---|---|---|---|
-| **Parte 1** — pista limpia | `SaoPaulo_map` (simulador) | `config/params.yaml` | `ros2 launch ftg_rv controller.launch.py` (+ simulador) |
-| **Parte 2** — obstáculos fijos | `maps/SaoPaulo_obs_map` (este paquete) | `config/params_obs.yaml` | `ros2 launch ftg_rv controller_obs.launch.py` (todo en uno) |
-| **Parte 2 + oponente** — obstáculos fijos y móvil | `maps/SaoPaulo_obs_map` (este paquete) | `params_obs.yaml` (ego) + `params_opp.yaml` (oponente) | `ros2 launch ftg_rv controller_opp.launch.py` (todo en uno) |
+| **Parte 1** — pista limpia | `maps/SaoPaulo_map` | `config/params.yaml` | `ros2 launch ftg_rv controller.launch.py` |
+| **Parte 2** — obstáculos fijos | `maps/SaoPaulo_obs_map` | `config/params_obs.yaml` | `ros2 launch ftg_rv controller_obs.launch.py` |
+| **Parte 2 + oponente** — obstáculos fijos y móvil | `maps/SaoPaulo_obs_map` | `params_obs.yaml` (ego) + `params_opp.yaml` (oponente) | `ros2 launch ftg_rv controller_opp.launch.py` |
+
+Los tres comandos son **todo en uno** (simulador + controlador en una sola
+terminal) y los dos mapas viajan **dentro de este paquete**, así que no hay
+que descargar mapas ni editar la configuración del simulador.
 
 ---
 
@@ -39,35 +43,11 @@ colcon build --packages-select ftg_rv
 source install/setup.bash
 ```
 
-### 1.3 Configurar el mapa SaoPaulo (una sola vez, solo Parte 1)
-
-Los escenarios con obstáculos no necesitan este paso: su mapa viaja dentro de
-este paquete y se instala solo con el `colcon build` de arriba.
-
-1. Descargar el mapa oficial (imagen **y** yaml) del repositorio
-   [f1tenth_racetracks](https://github.com/f1tenth/f1tenth_racetracks/tree/main/SaoPaulo)
-   y copiarlos a `src/f1tenth_gym_ros/maps/`:
-
-   ```bash
-   cd ~/F1Tenth-Repository/src/f1tenth_gym_ros/maps
-   wget https://raw.githubusercontent.com/f1tenth/f1tenth_racetracks/main/SaoPaulo/SaoPaulo_map.png
-   wget https://raw.githubusercontent.com/f1tenth/f1tenth_racetracks/main/SaoPaulo/SaoPaulo_map.yaml
-   ```
-
-2. Editar `src/f1tenth_gym_ros/config/sim.yaml` y apuntar `map_path` al
-   mapa (ruta absoluta, **sin** extensión):
-
-   ```yaml
-   map_path: '/home/TU_USUARIO/F1Tenth-Repository/src/f1tenth_gym_ros/maps/SaoPaulo_map'
-   ```
-
-3. **Recompilar el simulador** para que el cambio llegue a `install/`
-   (el launch lee el `sim.yaml` instalado, no el de `src/`):
-
-   ```bash
-   cd ~/F1Tenth-Repository
-   colcon build --packages-select f1tenth_gym_ros
-   ```
+No hay más pasos de configuración: los mapas SaoPaulo (limpio y con
+obstáculos) están incluidos en `maps/` de este paquete — el limpio es el
+oficial de [f1tenth_racetracks](https://github.com/f1tenth/f1tenth_racetracks/tree/main/SaoPaulo)
+— y los launch apuntan el simulador a ellos en tiempo de ejecución, sin
+editar el `sim.yaml` del simulador (ver sección 5).
 
 ## 2. Ejecución
 
@@ -84,35 +64,16 @@ un bloque bien visible con el número de vuelta, su tiempo y el acumulado:
 ==============================================
 ```
 
-### 2.1 Parte 1 — pista limpia (2 terminales)
+### 2.1 Parte 1 — pista limpia (1 terminal)
 
-Usa el mapa limpio del simulador (sección 1.3) y el tuning de
-`config/params.yaml`.
-
-Terminal 1 — simulador:
-
-```bash
-source /opt/ros/humble/setup.bash
-cd ~/F1Tenth-Repository && source install/setup.bash
-ros2 launch f1tenth_gym_ros gym_bridge_launch.py
-```
-
-Terminal 2 — controlador:
+Un solo comando levanta el simulador con el mapa SaoPaulo limpio **y** el
+controlador con el tuning de `config/params.yaml`:
 
 ```bash
 source /opt/ros/humble/setup.bash
 cd ~/F1Tenth-Repository && source install/setup.bash
 ros2 launch ftg_rv controller.launch.py
 ```
-
-> **Nota (mapa en RViz):** si RViz muestra *"No map received"*, el
-> `map_server` del simulador no llegó a activarse (condición de carrera de su
-> launch; el simulador funciona igual). Se activa a mano con:
->
-> ```bash
-> ros2 lifecycle set /map_server configure
-> ros2 lifecycle set /map_server activate
-> ```
 
 ### 2.2 Parte 2 — obstáculos fijos (1 terminal)
 
@@ -125,13 +86,13 @@ cd ~/F1Tenth-Repository && source install/setup.bash
 ros2 launch ftg_rv controller_obs.launch.py
 ```
 
-No hay que tocar `sim.yaml` para alternar entre escenarios: el launch
-`sim_obs.launch.py` sobreescribe los parámetros propios de cada uno —
-`map_path` del bridge y del `map_server` hacia el mapa instalado en el share
-de este paquete, `stheta` (la orientación inicial del vehículo, girada a
--60° para no arrancar de frente al primer obstáculo), `num_agent` (argumento
-de launch: 1 o 2) y la pose inicial del oponente — y todo lo demás (tópicos,
-etc.) se sigue leyendo del `sim.yaml` del simulador.
+No hay que tocar `sim.yaml` para alternar entre escenarios: los tres
+comandos incluyen el mismo `sim.launch.py` de este paquete, que recibe por
+argumentos lo propio de cada uno — `map` (el mapa instalado en el share de
+este paquete), `stheta` (la orientación inicial del vehículo; aquí girada a
+-60° para no arrancar de frente al primer obstáculo) y `num_agent` (1 o 2) —
+y todo lo demás (tópicos, pose del oponente, etc.) se sigue leyendo del
+`sim.yaml` del simulador o de los overrides del propio launch (sección 5).
 
 ### 2.3 Parte 2 + oponente — obstáculos fijos y vehículo móvil (1 terminal)
 
@@ -251,17 +212,17 @@ ftg_rv/
 ├── ftg_rv/
 │   └── reactive_node.py            # Todo el controlador (un solo nodo)
 ├── launch/
-│   ├── controller.launch.py        # Parte 1: solo el nodo, con params.yaml
-│   ├── sim_obs.launch.py           # Simulador con mapa con obstáculos (num_agent 1 o 2)
-│   ├── controller_obs.launch.py    # Parte 2: sim_obs + nodo con params_obs.yaml
-│   └── controller_opp.launch.py    # Parte 2 + oponente: sim_obs(2) + ego + oponente
+│   ├── sim.launch.py               # Simulador con mapa de este paquete (args: map, stheta, num_agent)
+│   ├── controller.launch.py        # Parte 1: sim (mapa limpio) + nodo con params.yaml
+│   ├── controller_obs.launch.py    # Parte 2: sim (mapa obs) + nodo con params_obs.yaml
+│   └── controller_opp.launch.py    # Parte 2 + oponente: sim (obs, 2 agentes) + ego + oponente
 ├── config/
 │   ├── params.yaml                 # Tuning Parte 1 (pista limpia)
 │   ├── params_obs.yaml             # Tuning Parte 2 (obstáculos, conservador)
 │   └── params_opp.yaml             # Tuning del oponente (más lento que el ego)
 ├── maps/
-│   ├── SaoPaulo_obs_map.png        # Mapa SaoPaulo con los 5 obstáculos fijos
-│   └── SaoPaulo_obs_map.yaml       # Metadatos del mapa (mismos que el original)
+│   ├── SaoPaulo_map.png/.yaml      # Mapa SaoPaulo oficial (f1tenth_racetracks)
+│   └── SaoPaulo_obs_map.png/.yaml  # El mismo mapa con los 5 obstáculos fijos
 ├── package.xml / setup.py / setup.cfg
 └── README.md
 ```
@@ -280,21 +241,25 @@ Funciones principales de `reactive_node.py`:
 | `odom_callback` | Vueltas (histéresis + tiempo mínimo) y cronómetro |
 | `publish_drive` | Publica el `AckermannDriveStamped` con el clamp del servo |
 
-### El mapa con obstáculos (Parte 2)
+### Los mapas y `sim.launch.py`
 
-Los 5 obstáculos fijos se dibujaron directamente sobre el PNG del mapa con
-GIMP (píxeles negros = ocupado para el simulador y el `map_server`), sobre
-una copia renombrada a `SaoPaulo_obs_map.png` que vive en este paquete con su
+Ambos mapas viajan en `maps/` de este paquete y se instalan en su share con
+el `colcon build`. El limpio (`SaoPaulo_map`) es el oficial de
+`f1tenth_racetracks`; los 5 obstáculos fijos de la Parte 2 se dibujaron
+directamente sobre una copia del PNG con GIMP (píxeles negros = ocupado para
+el simulador y el `map_server`), renombrada a `SaoPaulo_obs_map.png` con su
 propio yaml de metadatos. La imagen conserva las dimensiones del original
-(2000×2000 px), por lo que la resolución y el origen del yaml no cambian. Así
-el mapa original del simulador queda intacto y ambos escenarios conviven.
+(2000×2000 px), por lo que la resolución y el origen del yaml no cambian.
 
-Para lanzarlo sin modificar el simulador, `sim_obs.launch.py` replica los
-nodos de `gym_bridge_launch.py` pero pasa dos fuentes de parámetros al
+Para usar estos mapas sin modificar el simulador, `sim.launch.py` replica
+los nodos de `gym_bridge_launch.py` pero pasa dos fuentes de parámetros al
 bridge: `[sim.yaml, <overrides del escenario>]`. En `launch_ros` la última
-fuente gana, así que solo se sobreescriben el mapa, la orientación inicial y
-lo relativo al oponente; el resto de la configuración sigue viniendo del
-`sim.yaml` del simulador.
+fuente gana, así que solo se sobreescriben el mapa (argumento `map`), la
+orientación inicial del ego (argumento `stheta`), `num_agent` y la pose
+inicial del oponente; el resto de la configuración sigue viniendo del
+`sim.yaml` del simulador. Ventaja práctica: no hay que descargar mapas,
+editar `map_path` en `sim.yaml` ni recompilar el simulador para alternar
+entre escenarios.
 
 ### El oponente (Parte 2 con vehículo móvil)
 

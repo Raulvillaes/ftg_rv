@@ -1,13 +1,14 @@
 """Launch de la PARTE 2: simulador con obstaculos + controlador.
 
-Levanta sim_obs.launch.py (simulador con el mapa SaoPaulo con obstaculos) y
-reactive_node con el tuning conservador de config/params_obs.yaml. Es el
-equivalente "todo en uno" de la Parte 2; la Parte 1 se sigue lanzando con el
-simulador del profesor + controller.launch.py (params.yaml, mapa limpio).
+Levanta sim.launch.py con el mapa SaoPaulo con obstaculos (y el spawn girado
+-60 grados para no arrancar de frente al primer obstaculo) y reactive_node
+con el tuning conservador de config/params_obs.yaml. Es el equivalente de la
+Parte 2 al todo-en-uno de controller.launch.py (params.yaml, mapa limpio).
 
 Uso:
     ros2 launch ftg_rv controller_obs.launch.py
 """
+import math
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -22,7 +23,12 @@ def generate_launch_description():
 
     sim_obs = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(ftg_share, 'launch', 'sim_obs.launch.py')))
+            os.path.join(ftg_share, 'launch', 'sim.launch.py')),
+        launch_arguments={
+            'map': 'SaoPaulo_obs_map',
+            'stheta': str(math.radians(-60.0)),
+        }.items(),
+    )
 
     reactive_node = Node(
         package='ftg_rv',

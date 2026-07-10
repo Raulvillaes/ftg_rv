@@ -19,8 +19,10 @@ setup(
             glob('launch/*.launch.py')),
         (os.path.join('share', package_name, 'config'),
             glob('config/*.yaml')),
-        # Mapa SaoPaulo con los obstaculos fijos (Parte 2): PNG editado con
-        # GIMP + su yaml de metadatos, juntos para que map_path los resuelva.
+        # Mapas SaoPaulo (limpio y con los obstaculos fijos de la Parte 2):
+        # PNG + yaml de metadatos juntos para que map_path los resuelva. Al
+        # viajar en el share del paquete, no hay que tocar el sim.yaml del
+        # simulador para cambiar de mapa.
         (os.path.join('share', package_name, 'maps'),
             glob('maps/*')),
     ],

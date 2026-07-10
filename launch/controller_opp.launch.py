@@ -16,6 +16,7 @@ controlador se congela todo, incluido el ego.
 Uso:
     ros2 launch ftg_rv controller_opp.launch.py
 """
+import math
 import os
 
 from ament_index_python.packages import get_package_share_directory
@@ -30,8 +31,12 @@ def generate_launch_description():
 
     sim_obs = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            os.path.join(ftg_share, 'launch', 'sim_obs.launch.py')),
-        launch_arguments={'num_agent': '2'}.items(),
+            os.path.join(ftg_share, 'launch', 'sim.launch.py')),
+        launch_arguments={
+            'map': 'SaoPaulo_obs_map',
+            'stheta': str(math.radians(-60.0)),
+            'num_agent': '2',
+        }.items(),
     )
 
     ego_node = Node(
