@@ -1,4 +1,4 @@
-# ftg_rv — Controlador reactivo Follow the Gap (F1Tenth)
+# Controlador reactivo Follow the Gap (F1Tenth): ftg_rv
 
 Paquete ROS 2 (Humble, `ament_python`) que implementa un controlador reactivo
 **Follow the Gap** para el simulador F1Tenth, con **contador de vueltas** y
@@ -10,13 +10,13 @@ mapa y su propio tuning:
 
 | Escenario | Mapa | Parámetros | Comando |
 |---|---|---|---|
-| **Parte 1** — pista limpia | `maps/SaoPaulo_map` | `config/params.yaml` | `ros2 launch ftg_rv controller.launch.py` |
-| **Parte 2** — obstáculos fijos | `maps/SaoPaulo_obs_map` | `config/params_obs.yaml` | `ros2 launch ftg_rv controller_obs.launch.py` |
-| **Parte 2 + oponente** — obstáculos fijos y móvil | `maps/SaoPaulo_obs_map` | `params_obs.yaml` (ego) + `params_opp.yaml` (oponente) | `ros2 launch ftg_rv controller_opp.launch.py` |
+| **Parte 1**: pista limpia | `maps/SaoPaulo_map` | `config/params.yaml` | `ros2 launch ftg_rv controller.launch.py` |
+| **Parte 2**: obstáculos fijos | `maps/SaoPaulo_obs_map` | `config/params_obs.yaml` | `ros2 launch ftg_rv controller_obs.launch.py` |
+| **Parte 2 + oponente**: obstáculos fijos y móvil | `maps/SaoPaulo_obs_map` | `params_obs.yaml` (ego) + `params_opp.yaml` (oponente) | `ros2 launch ftg_rv controller_opp.launch.py` |
 
 Los tres comandos son **todo en uno** (simulador + controlador en una sola
-terminal) y los dos mapas viajan **dentro de este paquete**, así que no hay
-que descargar mapas ni editar la configuración del simulador.
+terminal) y los dos mapas viajan **dentro de este paquete**, no hay que
+descargar mapas ni editar la configuración del simulador.
 
 ---
 
@@ -43,30 +43,29 @@ colcon build --packages-select ftg_rv
 source install/setup.bash
 ```
 
-No hay más pasos de configuración: los mapas SaoPaulo (limpio y con
-obstáculos) están incluidos en `maps/` de este paquete — el limpio es el
-oficial de [f1tenth_racetracks](https://github.com/f1tenth/f1tenth_racetracks/tree/main/SaoPaulo)
-— y los launch apuntan el simulador a ellos en tiempo de ejecución, sin
-editar el `sim.yaml` del simulador (ver sección 5).
+Los mapas SaoPaulo (limpio y con obstáculos) están incluidos en `maps/` de este paquete. El limpio
+es el oficial de [f1tenth_racetracks](https://github.com/f1tenth/f1tenth_racetracks/tree/main/SaoPaulo).
+Los launch apuntan el simulador a ellos en tiempo de ejecución, sin necesidad de editar el
+`sim.yaml` del simulador.
 
 ## 2. Ejecución
 
-Cada escenario se lanza de forma independiente; abajo, los pasos y las
-terminales que necesita cada uno. En todos los casos, la consola del
-controlador muestra la meta fijada al arrancar y, al completar cada vuelta,
-un bloque bien visible con el número de vuelta, su tiempo y el acumulado:
+Cada escenario se lanza de forma independiente, en **una sola terminal**;
+abajo, los pasos. En todos los casos, la consola del controlador muestra
+la meta fijada al arrancar y, al completar cada vuelta, elnúmero de vuelta,
+su tiempo y el acumulado:
 
 ```
-==============================================
+============================================
   VUELTA 3 COMPLETADA
   Tiempo de vuelta:     61.42 s
   Tiempo acumulado:    184.90 s
-==============================================
+============================================
 ```
 
-### 2.1 Parte 1 — pista limpia (1 terminal)
+### 2.1 Parte 1: pista limpia
 
-Un solo comando levanta el simulador con el mapa SaoPaulo limpio **y** el
+Un solo comando levanta el simulador con el mapa SaoPaulo limpio y el
 controlador con el tuning de `config/params.yaml`:
 
 ```bash
@@ -75,10 +74,10 @@ cd ~/F1Tenth-Repository && source install/setup.bash
 ros2 launch ftg_rv controller.launch.py
 ```
 
-### 2.2 Parte 2 — obstáculos fijos (1 terminal)
+### 2.2 Parte 2a: obstáculos fijos
 
-Un solo comando levanta el simulador con el mapa con obstáculos **y** el
-controlador con el tuning conservador (`config/params_obs.yaml`):
+Un solo comando levanta el simulador con el mapa con obstáculos y el
+controlador con el tuning de `config/params_obs.yaml` (conservador para sortear los obstáculos):
 
 ```bash
 source /opt/ros/humble/setup.bash
@@ -86,15 +85,13 @@ cd ~/F1Tenth-Repository && source install/setup.bash
 ros2 launch ftg_rv controller_obs.launch.py
 ```
 
-No hay que tocar `sim.yaml` para alternar entre escenarios: los tres
-comandos incluyen el mismo `sim.launch.py` de este paquete, que recibe por
-argumentos lo propio de cada uno — `map` (el mapa instalado en el share de
-este paquete), `stheta` (la orientación inicial del vehículo; aquí girada a
--60° para no arrancar de frente al primer obstáculo) y `num_agent` (1 o 2) —
-y todo lo demás (tópicos, pose del oponente, etc.) se sigue leyendo del
-`sim.yaml` del simulador o de los overrides del propio launch (sección 5).
+No hace falta configurar el mapa en `sim.yaml`: los comandos incluyen el `sim.launch.py`
+de este paquete, que recibe por argumentos: el mapa (en `/maps` de este paquete),
+`stheta` (la orientación inicial del vehículo; girada a -60° en el mapa con obstáculos)
+y `num_agent` (1 o 2), el resto (los tópicos, pose del oponente, etc.) se lee del
+`sim.yaml` del simulador o de los overrides del propio launch.
 
-### 2.3 Parte 2 + oponente — obstáculos fijos y vehículo móvil (1 terminal)
+### 2.3 Parte 2b: obstáculos fijos y vehículo móvil
 
 Un solo comando levanta el simulador con el mapa con obstáculos, el ego y un
 **vehículo oponente** que corre el mismo controlador Follow the Gap a menor
@@ -109,9 +106,7 @@ ros2 launch ftg_rv controller_opp.launch.py
 No hay código nuevo para el oponente: es una segunda instancia de
 `reactive_node` remapeada a los tópicos del segundo coche del bridge
 (`/opp_scan`, `/opp_racecar/odom`, `/opp_drive`) con su propio yaml de
-parámetros. Detalle importante del bridge: con dos agentes el simulador **no
-avanza hasta que ambos coches publican su comando de manejo**, por eso el
-oponente y su controlador se lanzan siempre juntos desde este launch.
+parámetros. El simulador **no avanza hasta que ambos coches publican su comando de manejo**.
 
 En la consola, los logs de cada coche se distinguen por el nombre del nodo:
 `[reactive_node]` es el ego y `[opp_reactive_node]` el oponente (ambos
@@ -121,31 +116,42 @@ imprimen su propio contador de vueltas).
 
 Editar `config/params.yaml` (Parte 1), `config/params_obs.yaml` (Parte 2,
 ego) o `config/params_opp.yaml` (oponente), volver a ejecutar
-`colcon build --packages-select ftg_rv` (solo copia el yaml a `install/`) y
-relanzar el controlador. La lista completa de parámetros está en la
-sección 6.
+`colcon build --packages-select ftg_rv` y relanzar el controlador.
+La lista completa de parámetros está en la sección 6.
 
-## 3. Enfoque: el algoritmo Follow the Gap
+## 3. Topics
+
+`reactive_node.py` se suscribe y publica siempre en los mismos tres tópicos;
+lo único que cambia entre ego y oponente es el remapeo hecho en el launch
+(sección 2.3):
+
+| Tópico | Tipo | Dirección | Uso en el nodo |
+|---|---|---|---|
+| `/scan` | `sensor_msgs/LaserScan` | Suscripción | Entrada del pipeline Follow the Gap (`lidar_callback`) |
+| `/ego_racecar/odom` | `nav_msgs/Odometry` | Suscripción | Contador de vueltas y cronómetro (`odom_callback`) |
+| `/drive` | `ackermann_msgs/AckermannDriveStamped` | Publicación | Comando de dirección y velocidad (`publish_drive`) |
+
+En el oponente, `controller_opp.launch.py` remapea estos mismos tres nombres
+a `/opp_scan`, `/opp_racecar/odom` y `/opp_drive` (los tópicos del segundo
+coche del bridge); el código del nodo no cambia.
+
+## 4. Enfoque: el algoritmo Follow the Gap
 
 Follow the Gap es un algoritmo **reactivo**: no usa mapa ni planificación
 global; decide cada comando de dirección y velocidad mirando únicamente el
 scan actual del LiDAR. La idea central es *apuntar siempre hacia el hueco
 libre más grande*, esquivando implícitamente los obstáculos. Por eso el mismo
-controlador sirve para todos los escenarios sin cambios de lógica: los
-obstáculos fijos y el coche oponente aparecen en `/scan` igual que cualquier
-pared, y solo cambia el tuning (e incluso el propio oponente es este mismo
-nodo remapeado; ver sección 5).
+controlador sirve para todos los escenarios sin cambios de lógica, solo cambia
+el tuning (incluso el oponente es este mismo nodo remapeado).
 
 Sobre cada mensaje de `/scan` (a ~250 Hz) se ejecuta este pipeline:
 
 1. **Recorte del FOV** (`_compute_fov_indices`): el LiDAR cubre ~270°, pero
    solo interesan los rayos delanteros (±90° por defecto). Lo que queda
-   detrás de los hombros del auto no ayuda a decidir hacia dónde avanzar y
-   puede producir "gaps falsos" hacia atrás.
+   detrás del auto no ayuda a decidir hacia dónde avanzar.
 
 2. **Preprocesado** (`preprocess_lidar`):
-   - Lecturas inválidas (`NaN`) se tratan como obstáculo (0 m): lo
-     conservador ante un dato corrupto es asumir que allí hay algo.
+   - Lecturas inválidas (`NaN`) se tratan como obstáculo (0 m).
    - Lecturas infinitas o enormes se **saturan** a `max_range` (10 m): sin
      esto, una lectura de 30 m dominaría siempre la elección del objetivo.
    - **Media móvil** de `smoothing_window` rayos: elimina ruido puntual del
@@ -160,13 +166,12 @@ Sobre cada mensaje de `/scan` (a ~250 Hz) se ejecuta este pipeline:
 
 4. **Gap máximo** (`find_max_gap`): se umbraliza el scan (`gap_threshold`,
    rayos con más de 2 m son "libres") y se busca la **racha contigua más
-   larga** de rayos libres, de forma vectorizada con NumPy (sin bucles
-   Python, importante a 250 Hz).
+   larga** de rayos libres, de forma vectorizada con NumPy.
 
 5. **Mejor punto** (`find_best_point`): dentro del gap se mezcla el punto
    **más lejano** (rápido: apura las curvas) con el **centro del gap**
    (seguro: se aleja de las paredes) según `best_point_bias`
-   (0.0 = solo el más lejano, 1.0 = solo el centro). Es la perilla principal
+   (0.0 = solo el más lejano, 1.0 = solo el centro). Es el ajuste principal
    de tuning del comportamiento en curva. Detalle importante: en rectas
    largas muchos rayos saturan a `max_range` y empatan como "más lejano";
    entre los empatados se elige el más cercano al centro del gap, porque
@@ -186,11 +191,10 @@ Sobre cada mensaje de `/scan` (a ~250 Hz) se ejecuta este pipeline:
      la salida) y no frenaría al final de las rectas; con él, frena
      *entrando* a la curva y acelera *saliendo*, como se espera.
 
-Caso degenerado: si ningún rayo supera el umbral (no hay gap), el auto apunta
-al rayo más largo disponible a velocidad de curva, en vez de seguir a ciegas
-la última orden.
+Si ningún rayo supera el umbral (no hay gap), el auto apunta al rayo
+más largo disponible a velocidad de curva.
 
-## 4. Contador de vueltas y cronómetro
+## 5. Contador de vueltas y cronómetro
 
 Ambos viven en `odom_callback` (suscripción a `/ego_racecar/odom`):
 
@@ -205,7 +209,7 @@ Ambos viven en `odom_callback` (suscripción a `/ego_racecar/odom`):
 - **Cronómetro**: usa `self.get_clock().now()` (reloj de ROS). Al completar
   cada vuelta se imprime en consola el bloque mostrado en la sección 2.
 
-## 5. Estructura del código
+## 6. Estructura del código
 
 ```
 ftg_rv/
@@ -215,19 +219,19 @@ ftg_rv/
 │   ├── sim.launch.py               # Simulador con mapa de este paquete (args: map, stheta, num_agent)
 │   ├── controller.launch.py        # Parte 1: sim (mapa limpio) + nodo con params.yaml
 │   ├── controller_obs.launch.py    # Parte 2: sim (mapa obs) + nodo con params_obs.yaml
-│   └── controller_opp.launch.py    # Parte 2 + oponente: sim (obs, 2 agentes) + ego + oponente
+│   └── controller_opp.launch.py    # Parte 2.5: sim (mapa obs, 2 agentes) + ego + oponente
 ├── config/
 │   ├── params.yaml                 # Tuning Parte 1 (pista limpia)
 │   ├── params_obs.yaml             # Tuning Parte 2 (obstáculos, conservador)
 │   └── params_opp.yaml             # Tuning del oponente (más lento que el ego)
 ├── maps/
 │   ├── SaoPaulo_map.png/.yaml      # Mapa SaoPaulo oficial (f1tenth_racetracks)
-│   └── SaoPaulo_obs_map.png/.yaml  # El mismo mapa con los 5 obstáculos fijos
+│   └── SaoPaulo_obs_map.png/.yaml  # El mismo mapa con los obstáculos fijos
 ├── package.xml / setup.py / setup.cfg
 └── README.md
 ```
 
-Funciones principales de `reactive_node.py`:
+### Funciones principales de `reactive_node.py`:
 
 | Función | Qué hace |
 |---|---|
@@ -241,17 +245,33 @@ Funciones principales de `reactive_node.py`:
 | `odom_callback` | Vueltas (histéresis + tiempo mínimo) y cronómetro |
 | `publish_drive` | Publica el `AckermannDriveStamped` con el clamp del servo |
 
-### Los mapas y `sim.launch.py`
+## 7. Mapas
 
-Ambos mapas viajan en `maps/` de este paquete y se instalan en su share con
-el `colcon build`. El limpio (`SaoPaulo_map`) es el oficial de
-`f1tenth_racetracks`; los 5 obstáculos fijos de la Parte 2 se dibujaron
-directamente sobre una copia del PNG con GIMP (píxeles negros = ocupado para
-el simulador y el `map_server`), renombrada a `SaoPaulo_obs_map.png` con su
-propio yaml de metadatos. La imagen conserva las dimensiones del original
-(2000×2000 px), por lo que la resolución y el origen del yaml no cambian.
+Los píxeles negros son interpretados como espacio ocupado por el simulador y el
+`map_server`. Ambos mapas viajan en `maps/` de este paquete y se instalan en su
+share con el `colcon build`.
 
-Para usar estos mapas sin modificar el simulador, `sim.launch.py` replica
+### Mapa Limpio (`SaoPaulo_map`)
+Es el mapa SaoPaulo oficial de `f1tenth_racetracks`:
+
+![Mapa SaoPaulo limpio](maps/SaoPaulo_map.png)
+
+### Mapa con Obstáculos
+Los 5 obstáculos fijos de la Parte 2 se dibujaron directamente sobre una
+copia del PNG con GIMP, renombrada a `SaoPaulo_obs_map.png`:
+
+![Mapa SaoPaulo con obstáculos](maps/SaoPaulo_obs_map.png)
+
+El mapa cuenta con su propio yaml de metadatos. Como la imagen conserva
+las dimensiones del original (2000×2000 px), la resolución y el origen
+del yaml no cambian.
+
+
+## 8. Integración sin modificar el simulador
+
+### sim.launch.py
+
+Para usar los mapas sin modificar el simulador, `sim.launch.py` replica
 los nodos de `gym_bridge_launch.py` pero pasa dos fuentes de parámetros al
 bridge: `[sim.yaml, <overrides del escenario>]`. En `launch_ros` la última
 fuente gana, así que solo se sobreescriben el mapa (argumento `map`), la
@@ -261,7 +281,7 @@ inicial del oponente; el resto de la configuración sigue viniendo del
 editar `map_path` en `sim.yaml` ni recompilar el simulador para alternar
 entre escenarios.
 
-### El oponente (Parte 2 con vehículo móvil)
+### El oponente
 
 El bridge del simulador soporta un segundo coche (`num_agent: 2`) con sus
 propios tópicos: `/opp_scan`, `/opp_racecar/odom` y `/opp_drive`. El
@@ -272,7 +292,7 @@ mismo código conduce cualquier coche que le dé un LiDAR y acepte comandos
 Ackermann. Su pose inicial se coloca sobre la línea de carrera, por delante
 del ego, para que actúe como tráfico móvil a alcanzar y esquivar.
 
-## 6. Parámetros
+## 9. Parámetros
 
 Cada escenario carga su propio yaml (sección 2.4). Valores actuales:
 
@@ -300,14 +320,16 @@ Lógica del tuning de cada parte:
   libre) daba vueltas de ~67 s; la final logra **~38.7 s por vuelta** de
   forma estable y sin colisiones.
 - **Parte 2** (obstáculos): más conservador donde importa para sobrevivir al
-  slalom: menor tope en recta (10 m/s), frenado anticipado (`brake_distance`
-  5.0 m: los obstáculos aparecen en el scan con menos preaviso que una curva)
-  y `best_point_bias` 0.3 para apuntar algo más lejos dentro del gap y
+  zigzag: menor tope en recta (10 m/s), frenado anticipado (`brake_distance`
+  5.0) y `best_point_bias` 0.3 para apuntar algo más lejos dentro del gap y
   suavizar la trayectoria entre paredes alternadas.
 - **Oponente** (`params_opp.yaml`): igual que la Parte 2 pero con velocidades
   reducidas (6.0 / 4.5 / 3.0 m/s): debe ser claramente más lento que el ego
   para actuar como tráfico móvil, pero conservar el mismo comportamiento
   reactivo para sobrevivir él también a los obstáculos fijos.
+
+## 10. Videos
+
 
 ---
 
