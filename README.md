@@ -380,6 +380,14 @@ Lógica del tuning de cada parte:
 
 ## 10. Videos
 
+Video de evidencia por escenario: vehículo recorriendo la pista con el
+contador de vueltas y el cronómetro visibles en consola (sección 2).
+
+| Escenario | Video |
+|---|---|
+| **Parte 1** — pista limpia | [youtu.be/ICsL-3kO60Q](https://youtu.be/ICsL-3kO60Q) |
+| **Parte 2a** — obstáculos fijos | [youtu.be/NMpa-V67cUA](https://youtu.be/NMpa-V67cUA) |
+| **Parte 2b** — obstáculos fijos y vehículo móvil | [youtu.be/d-CdtewpTTA](https://youtu.be/d-CdtewpTTA) |
 
 ---
 
