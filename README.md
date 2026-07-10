@@ -5,14 +5,135 @@ Paquete ROS 2 (Humble, `ament_python`) que implementa un controlador reactivo
 **cronómetro por vuelta**. Proyecto del primer parcial de Vehículos Autónomos
 (ESPOL). Mapa asignado: **SaoPaulo** (Interlagos).
 
+El paquete soporta **dos escenarios ejecutables**, cada uno con su propio
+mapa y su propio tuning:
+
+| Escenario | Mapa | Parámetros | Comando |
+|---|---|---|---|
+| **Parte 1** — pista limpia | `SaoPaulo_map` (simulador) | `config/params.yaml` | `ros2 launch ftg_rv controller.launch.py` (+ simulador) |
+| **Parte 2** — obstáculos fijos | `maps/SaoPaulo_obs_map` (este paquete) | `config/params_obs.yaml` | `ros2 launch ftg_rv controller_obs.launch.py` (todo en uno) |
+
 ---
 
-## 1. Enfoque: el algoritmo Follow the Gap
+## 1. Instalación y ejecución
+
+### 1.1 Prerrequisitos
+
+- ROS 2 Humble y el workspace del curso (`F1Tenth-Repository`) con el
+  simulador `f1tenth_gym_ros` ya compilado y funcionando.
+
+### 1.2 Instalar este paquete
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/F1Tenth-Repository/src
+git clone https://github.com/Raulvillaes/ftg_rv.git ftg_rv
+cd ~/F1Tenth-Repository
+colcon build --packages-select ftg_rv
+source install/setup.bash
+```
+
+### 1.3 Configurar el mapa SaoPaulo (una sola vez, solo Parte 1)
+
+La Parte 2 no necesita este paso: su mapa con obstáculos viaja dentro de este
+paquete y se instala solo con el `colcon build` de arriba.
+
+1. Descargar el mapa oficial (imagen **y** yaml) del repositorio
+   [f1tenth_racetracks](https://github.com/f1tenth/f1tenth_racetracks/tree/main/SaoPaulo)
+   y copiarlos a `src/f1tenth_gym_ros/maps/`:
+
+   ```bash
+   cd ~/F1Tenth-Repository/src/f1tenth_gym_ros/maps
+   wget https://raw.githubusercontent.com/f1tenth/f1tenth_racetracks/main/SaoPaulo/SaoPaulo_map.png
+   wget https://raw.githubusercontent.com/f1tenth/f1tenth_racetracks/main/SaoPaulo/SaoPaulo_map.yaml
+   ```
+
+2. Editar `src/f1tenth_gym_ros/config/sim.yaml` y apuntar `map_path` al
+   mapa (ruta absoluta, **sin** extensión):
+
+   ```yaml
+   map_path: '/home/TU_USUARIO/F1Tenth-Repository/src/f1tenth_gym_ros/maps/SaoPaulo_map'
+   ```
+
+3. **Recompilar el simulador** para que el cambio llegue a `install/`
+   (el launch lee el `sim.yaml` instalado, no el de `src/`):
+
+   ```bash
+   cd ~/F1Tenth-Repository
+   colcon build --packages-select f1tenth_gym_ros
+   ```
+
+### 1.4 Ejecutar la Parte 1 (pista limpia)
+
+Terminal 1 — simulador:
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/F1Tenth-Repository && source install/setup.bash
+ros2 launch f1tenth_gym_ros gym_bridge_launch.py
+```
+
+Terminal 2 — controlador (tuning de `config/params.yaml`):
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/F1Tenth-Repository && source install/setup.bash
+ros2 launch ftg_rv controller.launch.py
+```
+
+> **Nota (mapa en RViz):** si RViz muestra *"No map received"*, el
+> `map_server` del simulador no llegó a activarse (condición de carrera de su
+> launch; el simulador funciona igual). Se activa a mano con:
+>
+> ```bash
+> ros2 lifecycle set /map_server configure
+> ros2 lifecycle set /map_server activate
+> ```
+
+### 1.5 Ejecutar la Parte 2 (obstáculos fijos)
+
+Un solo comando levanta el simulador con el mapa con obstáculos **y** el
+controlador con el tuning conservador (`config/params_obs.yaml`):
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ~/F1Tenth-Repository && source install/setup.bash
+ros2 launch ftg_rv controller_obs.launch.py
+```
+
+No hay que tocar `sim.yaml` para alternar entre las dos partes: el launch
+`sim_obs.launch.py` sobreescribe el parámetro `map_path` del bridge y del
+`map_server` hacia el mapa instalado en el share de este paquete, y todo lo
+demás (tópicos, número de agentes, poses iniciales) se sigue leyendo del
+`sim.yaml` del simulador.
+
+En la consola del controlador se ve la meta fijada al arrancar y, al
+completar cada vuelta, un bloque con el número de vuelta, su tiempo y el
+acumulado:
+
+```
+==============================================
+  VUELTA 3 COMPLETADA
+  Tiempo de vuelta:     61.42 s
+  Tiempo acumulado:    184.90 s
+==============================================
+```
+
+### 1.6 Tunear parámetros
+
+Editar `config/params.yaml` (Parte 1) o `config/params_obs.yaml` (Parte 2),
+volver a ejecutar `colcon build --packages-select ftg_rv` (solo copia el yaml
+a `install/`) y relanzar el controlador. La lista completa de parámetros está
+en la sección 5.
+
+## 2. Enfoque: el algoritmo Follow the Gap
 
 Follow the Gap es un algoritmo **reactivo**: no usa mapa ni planificación
 global; decide cada comando de dirección y velocidad mirando únicamente el
 scan actual del LiDAR. La idea central es *apuntar siempre hacia el hueco
-libre más grande*, esquivando implícitamente los obstáculos.
+libre más grande*, esquivando implícitamente los obstáculos. Por eso el mismo
+controlador sirve para las dos partes sin cambios de lógica: los obstáculos
+fijos aparecen en `/scan` igual que cualquier pared, y solo cambia el tuning.
 
 Sobre cada mensaje de `/scan` (a ~250 Hz) se ejecuta este pipeline:
 
@@ -68,7 +189,7 @@ Caso degenerado: si ningún rayo supera el umbral (no hay gap), el auto apunta
 al rayo más largo disponible a velocidad de curva, en vez de seguir a ciegas
 la última orden.
 
-## 2. Contador de vueltas y cronómetro
+## 3. Contador de vueltas y cronómetro
 
 Ambos viven en `odom_callback` (suscripción a `/ego_racecar/odom`):
 
@@ -81,27 +202,24 @@ Ambos viven en `odom_callback` (suscripción a `/ego_racecar/odom`):
   - *Tiempo mínimo de vuelta* (`min_lap_time`): cruces separados por menos
     de 10 s se ignoran.
 - **Cronómetro**: usa `self.get_clock().now()` (reloj de ROS). Al completar
-  cada vuelta se imprime en consola un bloque bien visible con el número de
-  vuelta, el tiempo de esa vuelta y el acumulado.
+  cada vuelta se imprime en consola el bloque mostrado en la sección 1.5.
 
-```
-==============================================
-  VUELTA 3 COMPLETADA
-  Tiempo de vuelta:     61.42 s
-  Tiempo acumulado:    184.90 s
-==============================================
-```
-
-## 3. Estructura del código
+## 4. Estructura del código
 
 ```
 ftg_rv/
 ├── ftg_rv/
-│   └── reactive_node.py        # Todo el controlador (un solo nodo)
+│   └── reactive_node.py            # Todo el controlador (un solo nodo)
 ├── launch/
-│   └── controller.launch.py    # Lanza el nodo cargando config/params.yaml
+│   ├── controller.launch.py        # Parte 1: solo el nodo, con params.yaml
+│   ├── sim_obs.launch.py           # Simulador con el mapa con obstáculos
+│   └── controller_obs.launch.py    # Parte 2: sim_obs + nodo con params_obs.yaml
 ├── config/
-│   └── params.yaml             # Parámetros tunables sin recompilar
+│   ├── params.yaml                 # Tuning Parte 1 (pista limpia)
+│   └── params_obs.yaml             # Tuning Parte 2 (obstáculos, conservador)
+├── maps/
+│   ├── SaoPaulo_obs_map.png        # Mapa SaoPaulo con los 5 obstáculos fijos
+│   └── SaoPaulo_obs_map.yaml       # Metadatos del mapa (mismos que el original)
 ├── package.xml / setup.py / setup.cfg
 └── README.md
 ```
@@ -120,112 +238,53 @@ Funciones principales de `reactive_node.py`:
 | `odom_callback` | Vueltas (histéresis + tiempo mínimo) y cronómetro |
 | `publish_drive` | Publica el `AckermannDriveStamped` con el clamp del servo |
 
-### Parámetros (`config/params.yaml`)
+### El mapa con obstáculos (Parte 2)
 
-| Parámetro | Valor | Significado |
-|---|---|---|
-| `max_speed` | 10.0 m/s | Velocidad en recta |
-| `mid_speed` | 6.0 m/s | Velocidad en curva suave |
-| `corner_speed` | 3.0 m/s | Velocidad en curva cerrada |
-| `steering_threshold_low/high` | 10° / 20° | Umbrales de los 3 niveles de velocidad |
-| `brake_distance` | 2.5 m | Espacio libre frontal al que se va a `corner_speed` |
-| `full_speed_distance` | 7.0 m | Espacio libre frontal que permite `max_speed` |
-| `fov_angle` | 90° | Semiancho del FOV útil |
-| `smoothing_window` | 5 | Ventana de la media móvil |
-| `max_range` | 10.0 m | Saturación del LiDAR |
-| `gap_threshold` | 2.0 m | Distancia mínima de un rayo "libre" |
-| `bubble_radius` | 0.4 m | Radio de la burbuja de seguridad |
-| `best_point_bias` | 0.4 | 0 = punto más lejano, 1 = centro del gap |
-| `finish_line_tolerance` | 4.0 m | Radio de detección de la meta |
-| `min_lap_time` | 10.0 s | Tiempo mínimo entre cruces de meta |
+Los 5 obstáculos fijos se dibujaron directamente sobre el PNG del mapa con
+GIMP (píxeles negros = ocupado para el simulador y el `map_server`), sobre
+una copia renombrada a `SaoPaulo_obs_map.png` que vive en este paquete con su
+propio yaml de metadatos. La imagen conserva las dimensiones del original
+(2000×2000 px), por lo que la resolución y el origen del yaml no cambian. Así
+el mapa original del simulador queda intacto y ambos escenarios conviven.
 
-Estos valores fueron ajustados iterativamente en el mapa SaoPaulo: la
-configuración inicial conservadora (5.0/3.0/1.5 m/s, sin freno por espacio
-libre) daba vueltas de ~67 s; la configuración final logra **~38.7 s por
-vuelta** de forma estable y sin colisiones.
+Para lanzarlo sin modificar el simulador, `sim_obs.launch.py` replica los
+nodos de `gym_bridge_launch.py` pero pasa dos fuentes de parámetros al
+bridge: `[sim.yaml, {'map_path': <mapa de este paquete>}]`. En `launch_ros`
+la última fuente gana, así que solo se sobreescribe el mapa y el resto de la
+configuración sigue viniendo del `sim.yaml` del simulador.
 
-## 4. Instrucciones de ejecución
+## 5. Parámetros
 
-### Prerrequisitos
+Cada escenario carga su propio yaml (sección 1.6). Valores actuales:
 
-- ROS 2 Humble y el workspace del curso (`F1Tenth-Repository`) con el
-  simulador `f1tenth_gym_ros` ya compilado y funcionando.
+| Parámetro | Parte 1 | Parte 2 | Significado |
+|---|---|---|---|
+| `max_speed` | 12.0 m/s | 10.0 m/s | Velocidad en recta |
+| `mid_speed` | 7.0 m/s | 6.5 m/s | Velocidad en curva suave |
+| `corner_speed` | 4.0 m/s | 4.0 m/s | Velocidad en curva cerrada |
+| `steering_threshold_low/high` | 10° / 20° | 10° / 17.5° | Umbrales de los 3 niveles de velocidad |
+| `brake_distance` | 2.5 m | 5.0 m | Espacio libre frontal al que se va a `corner_speed` |
+| `full_speed_distance` | 8.0 m | 8.0 m | Espacio libre frontal que permite `max_speed` |
+| `fov_angle` | 90° | 90° | Semiancho del FOV útil |
+| `smoothing_window` | 5 | 5 | Ventana de la media móvil |
+| `max_range` | 10.0 m | 10.0 m | Saturación del LiDAR |
+| `gap_threshold` | 2.0 m | 2.0 m | Distancia mínima de un rayo "libre" |
+| `bubble_radius` | 0.4 m | 0.4 m | Radio de la burbuja de seguridad |
+| `best_point_bias` | 0.4 | 0.3 | 0 = punto más lejano, 1 = centro del gap |
+| `finish_line_tolerance` | 4.0 m | 4.0 m | Radio de detección de la meta |
+| `min_lap_time` | 10.0 s | 10.0 s | Tiempo mínimo entre cruces de meta |
 
-### 4.1 Configurar el mapa SaoPaulo (una sola vez)
+Lógica del tuning de cada parte:
 
-1. Descargar el mapa oficial (imagen **y** yaml) del repositorio
-   [f1tenth_racetracks](https://github.com/f1tenth/f1tenth_racetracks/tree/main/SaoPaulo)
-   y copiarlos a `src/f1tenth_gym_ros/maps/`:
-
-   ```bash
-   cd ~/F1Tenth-Repository/src/f1tenth_gym_ros/maps
-   wget https://raw.githubusercontent.com/f1tenth/f1tenth_racetracks/main/SaoPaulo/SaoPaulo_map.png
-   wget https://raw.githubusercontent.com/f1tenth/f1tenth_racetracks/main/SaoPaulo/SaoPaulo_map.yaml
-   ```
-
-2. Editar `src/f1tenth_gym_ros/config/sim.yaml` y apuntar `map_path` al
-   mapa (ruta absoluta, **sin** extensión):
-
-   ```yaml
-   map_path: '/home/TU_USUARIO/F1Tenth-Repository/src/f1tenth_gym_ros/maps/SaoPaulo_map'
-   ```
-
-3. **Recompilar el simulador** para que el cambio llegue a `install/`
-   (el launch lee el `sim.yaml` instalado, no el de `src/`):
-
-   ```bash
-   source /opt/ros/humble/setup.bash
-   cd ~/F1Tenth-Repository
-   colcon build --packages-select f1tenth_gym_ros
-   ```
-
-### 4.2 Instalar este paquete
-
-```bash
-source /opt/ros/humble/setup.bash
-cd ~/F1Tenth-Repository/src
-git clone https://github.com/Raulvillaes/ftg_rv.git ftg_rv
-cd ~/F1Tenth-Repository
-colcon build --packages-select ftg_rv
-source install/setup.bash
-```
-
-### 4.3 Ejecutar
-
-Terminal 1 — simulador:
-
-```bash
-source /opt/ros/humble/setup.bash
-cd ~/F1Tenth-Repository && source install/setup.bash
-ros2 launch f1tenth_gym_ros gym_bridge_launch.py
-```
-
-> **Nota (mapa en RViz):** el launch del simulador tiene una condición de
-> carrera y normalmente el `map_server` no llega a activarse (RViz muestra
-> *"No map received"*; el simulador funciona igual). Mi
-> `controller.launch.py` lo activa automáticamente al arrancar, así que
-> basta con lanzar el controlador. Si aun así hiciera falta hacerlo a mano:
->
-> ```bash
-> ros2 lifecycle set /map_server configure
-> ros2 lifecycle set /map_server activate
-> ```
-
-Terminal 2 — controlador:
-
-```bash
-source /opt/ros/humble/setup.bash
-cd ~/F1Tenth-Repository && source install/setup.bash
-ros2 launch ftg_rv controller.launch.py
-```
-
-En la consola del controlador se verá la meta fijada al arrancar y, al
-completar cada vuelta, el bloque con el número de vuelta, su tiempo y el
-acumulado.
-
-Para tunear el comportamiento basta editar `config/params.yaml`, volver a
-ejecutar `colcon build --packages-select ftg_rv` (solo copia el yaml a
-`install/`) y relanzar el controlador.
+- **Parte 1** (pista limpia): ajustado iterativamente en SaoPaulo. La
+  configuración inicial conservadora (5.0/3.0/1.5 m/s, sin freno por espacio
+  libre) daba vueltas de ~67 s; la final logra **~38.7 s por vuelta** de
+  forma estable y sin colisiones.
+- **Parte 2** (obstáculos): más conservador donde importa para sobrevivir al
+  slalom: menor tope en recta (10 m/s), frenado anticipado (`brake_distance`
+  5.0 m: los obstáculos aparecen en el scan con menos preaviso que una curva)
+  y `best_point_bias` 0.3 para apuntar algo más lejos dentro del gap y
+  suavizar la trayectoria entre paredes alternadas.
 
 ---
 
