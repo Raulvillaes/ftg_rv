@@ -1,13 +1,15 @@
 """Launch de la PARTE 2 con OPONENTE: obstaculos fijos + vehiculo movil.
 
-Levanta el simulador con el mapa con obstaculos y num_agent=2, y DOS
-instancias del mismo controlador Follow the Gap:
+Levanta el simulador con el mapa con obstaculos y num_agent=2, y:
 
-- Ego: reactive_node con el tuning de config/params_obs.yaml, en los topicos
-  de siempre (/scan, /ego_racecar/odom, /drive).
-- Oponente: el MISMO ejecutable, remapeado a los topicos del segundo coche
-  (/opp_scan, /opp_racecar/odom, /opp_drive) y con el tuning mas lento de
+- Ego: reactive_node (Follow the Gap) + lap_timer_node (vueltas y
+  cronometro), con el tuning de config/params_obs.yaml, en los topicos de
+  siempre (/scan, /ego_racecar/odom, /drive).
+- Oponente: el MISMO ejecutable reactive_node, remapeado a los topicos del
+  segundo coche (/opp_scan, /opp_drive) y con el tuning mas lento de
   config/params_opp.yaml. No hay codigo nuevo: solo remap + parametros.
+  El oponente NO lleva lap_timer_node: solo el ego cuenta vueltas, para que
+  la consola del video no se mezcle con el conteo del oponente.
 
 El oponente es obligatorio con num_agent=2: el bridge no da un paso de
 simulacion hasta recibir comandos en /drive Y en /opp_drive, asi que sin su
@@ -48,6 +50,17 @@ def generate_launch_description():
         emulate_tty=True,       # conserva colores/formato del logger de ROS 2
     )
 
+    ego_lap_timer_node = Node(
+        package='ftg_rv',
+        executable='lap_timer_node',
+        name='lap_timer_node',
+        parameters=[os.path.join(ftg_share, 'config', 'params_obs.yaml')],
+        output='screen',        # logs visibles en la consola (video de evidencia)
+        emulate_tty=True,
+    )
+
+    # El oponente no se suscribe a odometria (reactive_node ya no la usa), asi
+    # que no hace falta remapear /ego_racecar/odom aqui.
     opp_node = Node(
         package='ftg_rv',
         executable='reactive_node',
@@ -55,11 +68,11 @@ def generate_launch_description():
         parameters=[os.path.join(ftg_share, 'config', 'params_opp.yaml')],
         remappings=[
             ('/scan', '/opp_scan'),
-            ('/ego_racecar/odom', '/opp_racecar/odom'),
             ('/drive', '/opp_drive'),
         ],
         output='screen',
         emulate_tty=True,
     )
 
-    return LaunchDescription([sim_obs, ego_node, opp_node])
+    return LaunchDescription(
+        [sim_obs, ego_node, ego_lap_timer_node, opp_node])

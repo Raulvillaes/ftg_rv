@@ -51,8 +51,8 @@ Los launch apuntan el simulador a ellos en tiempo de ejecución, sin necesidad d
 ## 2. Ejecución
 
 Cada escenario se lanza de forma independiente, en **una sola terminal**;
-abajo, los pasos. En todos los casos, la consola del controlador muestra
-la meta fijada al arrancar y, al completar cada vuelta, elnúmero de vuelta,
+abajo, los pasos. En todos los casos, la consola de `lap_timer_node` muestra
+la meta fijada al arrancar y, al completar cada vuelta, el número de vuelta,
 su tiempo y el acumulado:
 
 ```
@@ -105,12 +105,15 @@ ros2 launch ftg_rv controller_opp.launch.py
 
 No hay código nuevo para el oponente: es una segunda instancia de
 `reactive_node` remapeada a los tópicos del segundo coche del bridge
-(`/opp_scan`, `/opp_racecar/odom`, `/opp_drive`) con su propio yaml de
-parámetros. El simulador **no avanza hasta que ambos coches publican su comando de manejo**.
+(`/opp_scan`, `/opp_drive`) con su propio yaml de parámetros. El simulador
+**no avanza hasta que ambos coches publican su comando de manejo**.
 
-En la consola, los logs de cada coche se distinguen por el nombre del nodo:
-`[reactive_node]` es el ego y `[opp_reactive_node]` el oponente (ambos
-imprimen su propio contador de vueltas).
+En la consola, los logs de cada nodo se distinguen por su nombre:
+`[reactive_node]` es el Follow the Gap del ego, `[opp_reactive_node]` el del
+oponente y `[lap_timer_node]` el contador de vueltas y cronómetro. Este
+escenario lanza `lap_timer_node` **solo para el ego**: el oponente no cuenta
+vueltas, así la consola del video de evidencia no mezcla el conteo de los
+dos autos (ver sección 5).
 
 ### 2.4 Tunear parámetros
 
@@ -121,19 +124,19 @@ La lista completa de parámetros está en la sección 6.
 
 ## 3. Topics
 
-`reactive_node.py` se suscribe y publica siempre en los mismos tres tópicos;
-lo único que cambia entre ego y oponente es el remapeo hecho en el launch
-(sección 2.3):
+Dos nodos, cada uno con su propia responsabilidad y sus propios tópicos:
 
-| Tópico | Tipo | Dirección | Uso en el nodo |
-|---|---|---|---|
-| `/scan` | `sensor_msgs/LaserScan` | Suscripción | Entrada del pipeline Follow the Gap (`lidar_callback`) |
-| `/ego_racecar/odom` | `nav_msgs/Odometry` | Suscripción | Contador de vueltas y cronómetro (`odom_callback`) |
-| `/drive` | `ackermann_msgs/AckermannDriveStamped` | Publicación | Comando de dirección y velocidad (`publish_drive`) |
+| Nodo | Tópico | Tipo | Dirección | Uso |
+|---|---|---|---|---|
+| `reactive_node` | `/scan` | `sensor_msgs/LaserScan` | Suscripción | Entrada del pipeline Follow the Gap (`lidar_callback`) |
+| `reactive_node` | `/drive` | `ackermann_msgs/AckermannDriveStamped` | Publicación | Comando de dirección y velocidad (`publish_drive`) |
+| `lap_timer_node` | `/ego_racecar/odom` | `nav_msgs/Odometry` | Suscripción | Contador de vueltas y cronómetro (`odom_callback`) |
 
-En el oponente, `controller_opp.launch.py` remapea estos mismos tres nombres
-a `/opp_scan`, `/opp_racecar/odom` y `/opp_drive` (los tópicos del segundo
-coche del bridge); el código del nodo no cambia.
+`reactive_node.py` no sabe nada de vueltas ni de odometría: solo percibe
+(`/scan`) y actúa (`/drive`). En el oponente, `controller_opp.launch.py`
+remapea `/scan` y `/drive` a `/opp_scan` y `/opp_drive` (los tópicos del
+segundo coche del bridge); el código del nodo no cambia. `lap_timer_node` es
+independiente de `reactive_node` y solo se lanza para el ego (ver sección 5).
 
 ## 4. Enfoque: el algoritmo Follow the Gap
 
@@ -196,7 +199,15 @@ más largo disponible a velocidad de curva.
 
 ## 5. Contador de vueltas y cronómetro
 
-Ambos viven en `odom_callback` (suscripción a `/ego_racecar/odom`):
+Viven en un nodo aparte, `lap_timer_node.py`, suscrito únicamente a
+`/ego_racecar/odom` (no toca `/scan` ni `/drive`). Está separado de
+`reactive_node` a propósito: cuando `controller_opp.launch.py` lanza una
+segunda instancia de `reactive_node` remapeada como oponente, esa instancia
+no imprime ningún conteo de vueltas propio, porque `lap_timer_node` solo se
+lanza una vez, para el ego. Así la consola del video de evidencia muestra
+un único contador y cronómetro, sin mezclarse con el auto oponente.
+
+Toda la lógica vive en `odom_callback`:
 
 - **Meta**: la posición del *primer* mensaje de odometría (donde aparece el
   auto). Una vuelta se cuenta cuando el auto vuelve a entrar al círculo de
@@ -214,16 +225,17 @@ Ambos viven en `odom_callback` (suscripción a `/ego_racecar/odom`):
 ```
 ftg_rv/
 ├── ftg_rv/
-│   └── reactive_node.py            # Todo el controlador (un solo nodo)
+│   ├── reactive_node.py            # Follow the Gap: /scan -> /drive (un nodo, sin vueltas)
+│   └── lap_timer_node.py           # Contador de vueltas y cronometro: /ego_racecar/odom
 ├── launch/
 │   ├── sim.launch.py               # Simulador con mapa de este paquete (args: map, stheta, num_agent)
-│   ├── controller.launch.py        # Parte 1: sim (mapa limpio) + nodo con params.yaml
-│   ├── controller_obs.launch.py    # Parte 2: sim (mapa obs) + nodo con params_obs.yaml
-│   └── controller_opp.launch.py    # Parte 2.5: sim (mapa obs, 2 agentes) + ego + oponente
+│   ├── controller.launch.py        # Parte 1: sim (mapa limpio) + reactive_node + lap_timer_node
+│   ├── controller_obs.launch.py    # Parte 2: sim (mapa obs) + reactive_node + lap_timer_node
+│   └── controller_opp.launch.py    # Parte 2.5: sim (mapa obs, 2 agentes) + ego + lap_timer_node + oponente
 ├── config/
-│   ├── params.yaml                 # Tuning Parte 1 (pista limpia)
-│   ├── params_obs.yaml             # Tuning Parte 2 (obstáculos, conservador)
-│   └── params_opp.yaml             # Tuning del oponente (más lento que el ego)
+│   ├── params.yaml                 # Tuning Parte 1 (reactive_node + lap_timer_node)
+│   ├── params_obs.yaml             # Tuning Parte 2, obstáculos (reactive_node + lap_timer_node)
+│   └── params_opp.yaml             # Tuning del oponente (solo reactive_node, más lento que el ego)
 ├── maps/
 │   ├── SaoPaulo_map.png/.yaml      # Mapa SaoPaulo oficial (f1tenth_racetracks)
 │   └── SaoPaulo_obs_map.png/.yaml  # El mismo mapa con los obstáculos fijos
@@ -231,7 +243,7 @@ ftg_rv/
 └── README.md
 ```
 
-### Funciones principales de `reactive_node.py`:
+### Funciones principales de `reactive_node.py` (percepción y control):
 
 | Función | Qué hace |
 |---|---|
@@ -242,8 +254,13 @@ ftg_rv/
 | `find_max_gap` | Racha contigua más larga de rayos libres |
 | `find_best_point` | Mezcla lejano/centro del gap (`best_point_bias`) |
 | `compute_speed` | Mínimo entre velocidad por ángulo y por espacio libre |
-| `odom_callback` | Vueltas (histéresis + tiempo mínimo) y cronómetro |
 | `publish_drive` | Publica el `AckermannDriveStamped` con el clamp del servo |
+
+### Funciones principales de `lap_timer_node.py` (vueltas y cronómetro):
+
+| Función | Qué hace |
+|---|---|
+| `odom_callback` | Fija la meta, cuenta vueltas (histéresis + tiempo mínimo) e imprime el cronómetro |
 
 ## 7. Mapas
 
@@ -296,6 +313,8 @@ del ego, para que actúe como tráfico móvil a alcanzar y esquivar.
 
 Cada escenario carga su propio yaml (sección 2.4). Valores actuales:
 
+#### Parámetros de `reactive_node` (percepción y control)
+
 | Parámetro | Parte 1 | Parte 2 | Significado |
 |---|---|---|---|
 | `max_speed` | 12.0 m/s | 10.0 m/s | Velocidad en recta |
@@ -310,8 +329,17 @@ Cada escenario carga su propio yaml (sección 2.4). Valores actuales:
 | `gap_threshold` | 2.0 m | 2.0 m | Distancia mínima de un rayo "libre" |
 | `bubble_radius` | 0.4 m | 0.4 m | Radio de la burbuja de seguridad |
 | `best_point_bias` | 0.4 | 0.3 | 0 = punto más lejano, 1 = centro del gap |
-| `finish_line_tolerance` | 4.0 m | 4.0 m | Radio de detección de la meta |
-| `min_lap_time` | 10.0 s | 10.0 s | Tiempo mínimo entre cruces de meta |
+
+#### Parámetros de `lap_timer_node` (vueltas y cronómetro)
+
+Misma clave (`lap_timer_node: ros__parameters:`) en `params.yaml` y
+`params_obs.yaml`; no existen en `params_opp.yaml` porque el oponente no
+lleva este nodo (sección 5):
+
+| Parámetro | Valor | Significado |
+|---|---|---|
+| `finish_line_tolerance` | 4.0 m | Radio de detección de la meta |
+| `min_lap_time` | 10.0 s | Tiempo mínimo entre cruces de meta |
 
 Lógica del tuning de cada parte:
 

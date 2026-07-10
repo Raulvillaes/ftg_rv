@@ -41,6 +41,7 @@ setup(
     entry_points={
         'console_scripts': [
             'reactive_node = ftg_rv.reactive_node:main',
+            'lap_timer_node = ftg_rv.lap_timer_node:main',
         ],
     },
 )

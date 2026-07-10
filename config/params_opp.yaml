@@ -5,6 +5,9 @@
 # obstaculos fijos.
 # La clave raiz es el NOMBRE del nodo oponente (opp_reactive_node), que se
 # lanza remapeado a /opp_scan, /opp_racecar/odom y /opp_drive.
+# El oponente NO lleva lap_timer_node: solo el ego cuenta vueltas y
+# cronometra (ver controller_opp.launch.py), asi la consola del video no se
+# mezcla con el conteo del oponente.
 opp_reactive_node:
   ros__parameters:
     # ---------- Velocidad ----------
@@ -24,7 +27,3 @@ opp_reactive_node:
     gap_threshold: 2.0          # m: distancia minima para considerar un rayo "libre"
     bubble_radius: 0.4          # m: radio de la burbuja de seguridad
     best_point_bias: 0.3        # 0.0 = punto mas lejano del gap, 1.0 = centro del gap
-
-    # ---------- Vueltas y cronometro ----------
-    finish_line_tolerance: 4.0  # m: radio alrededor de la posicion inicial (meta)
-    min_lap_time: 10.0          # s: tiempo minimo entre cruces (anti doble conteo)

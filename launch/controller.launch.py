@@ -1,7 +1,8 @@
 """Launch de la PARTE 1: simulador con el mapa limpio + controlador.
 
 Levanta sim.launch.py (simulador con el mapa SaoPaulo limpio instalado en
-este paquete) y reactive_node con el tuning de config/params.yaml, cargado
+este paquete), reactive_node (Follow the Gap) y lap_timer_node (contador de
+vueltas y cronometro), ambos con el tuning de config/params.yaml, cargado
 como archivo de parametros para poder tunear sin tocar el codigo.
 
 Uso:
@@ -34,4 +35,13 @@ def generate_launch_description():
         emulate_tty=True,       # conserva colores/formato del logger de ROS 2
     )
 
-    return LaunchDescription([sim, reactive_node])
+    lap_timer_node = Node(
+        package='ftg_rv',
+        executable='lap_timer_node',
+        name='lap_timer_node',
+        parameters=[os.path.join(ftg_share, 'config', 'params.yaml')],
+        output='screen',        # logs visibles en la consola (video de evidencia)
+        emulate_tty=True,
+    )
+
+    return LaunchDescription([sim, reactive_node, lap_timer_node])

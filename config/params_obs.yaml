@@ -22,7 +22,9 @@ reactive_node:
     bubble_radius: 0.4          # m: radio de la burbuja de seguridad
     best_point_bias: 0.3        # 0.0 = punto mas lejano del gap, 1.0 = centro del gap
 
-    # ---------- Vueltas y cronometro ----------
+# Vueltas y cronometro: nodo aparte (lap_timer_node), suscrito solo a odometria.
+lap_timer_node:
+  ros__parameters:
     finish_line_tolerance: 4.0  # m: radio alrededor de la posicion inicial (meta);
                                 # la linea de carrera puede pasar a ~3 m del spawn
     min_lap_time: 10.0          # s: tiempo minimo entre cruces (anti doble conteo)

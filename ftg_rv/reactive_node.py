@@ -1,22 +1,21 @@
 """Nodo reactivo Follow the Gap para el simulador F1Tenth.
 
-Se suscribe al LiDAR (/scan) y a la odometria (/ego_racecar/odom) y publica
-comandos de conduccion (/drive). Implementa:
-  1. Algoritmo Follow the Gap (percepcion + control).
-  2. Contador de vueltas por cruce de meta con histeresis.
-  3. Cronometro por vuelta y tiempo acumulado.
+Se suscribe al LiDAR (/scan) y publica comandos de conduccion (/drive) con el
+algoritmo Follow the Gap (percepcion + control). El conteo de vueltas y el
+cronometro viven en un nodo aparte (lap_timer_node), que se suscribe a la
+odometria por separado: asi, cuando este mismo nodo se lanza remapeado como
+oponente, no imprime su propio conteo de vueltas en la consola.
 """
 import rclpy
 from rclpy.node import Node
 
 import numpy as np
 from sensor_msgs.msg import LaserScan
-from nav_msgs.msg import Odometry
 from ackermann_msgs.msg import AckermannDriveStamped
 
 
 class ReactiveNode(Node):
-    """Controlador reactivo Follow the Gap con conteo y cronometraje de vueltas."""
+    """Controlador reactivo Follow the Gap."""
 
     def __init__(self):
         super().__init__('reactive_node')
@@ -35,8 +34,6 @@ class ReactiveNode(Node):
         self.declare_parameter('gap_threshold', 2.0)
         self.declare_parameter('bubble_radius', 0.4)
         self.declare_parameter('best_point_bias', 0.4)
-        self.declare_parameter('finish_line_tolerance', 4.0)
-        self.declare_parameter('min_lap_time', 10.0)
 
         p = self.get_parameter
         self.max_speed = p('max_speed').value
@@ -52,28 +49,15 @@ class ReactiveNode(Node):
         self.gap_threshold = p('gap_threshold').value
         self.bubble_radius = p('bubble_radius').value
         self.best_point_bias = p('best_point_bias').value
-        self.finish_line_tolerance = p('finish_line_tolerance').value
-        self.min_lap_time = p('min_lap_time').value
 
         # Indices del recorte de FOV; se calculan con el primer scan recibido
         # (dependen de angle_min/angle_increment, que no conocemos hasta ahi).
         self.fov_start = None
         self.fov_end = None
 
-        # ---------- Estado de vueltas y cronometro ----------
-        self.finish_line = None      # (x, y) de la meta; primer mensaje de odom
-        self.lap_count = 0
-        self.lap_start_time = None   # rclpy.time.Time del inicio de la vuelta
-        self.total_start_time = None # rclpy.time.Time del inicio de la corrida
-        # Histeresis: hay que ALEJARSE de la meta antes de poder contar el
-        # siguiente cruce; evita contar varias veces el mismo paso por meta.
-        self.lap_armed = False
-
         # ---------- Comunicacion ----------
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.lidar_callback, 10)
-        self.odom_sub = self.create_subscription(
-            Odometry, '/ego_racecar/odom', self.odom_callback, 10)
         self.drive_pub = self.create_publisher(
             AckermannDriveStamped, '/drive', 10)
 
@@ -243,53 +227,6 @@ class ReactiveNode(Node):
             + frac * (self.max_speed - self.corner_speed)
 
         return min(speed_steer, speed_clearance)
-
-    def odom_callback(self, msg: Odometry):
-        """Cuenta vueltas y cronometra usando la posicion del auto.
-
-        La meta es la posicion del PRIMER mensaje de odometria (donde aparece
-        el auto). Una vuelta se cuenta cuando el auto vuelve a entrar al
-        circulo de radio finish_line_tolerance alrededor de la meta, con dos
-        protecciones contra dobles conteos:
-          - Histeresis: primero debe salir del circulo (lap_armed).
-          - Tiempo minimo de vuelta (min_lap_time).
-        """
-        x = msg.pose.pose.position.x
-        y = msg.pose.pose.position.y
-        now = self.get_clock().now()
-
-        # Primer mensaje: fijar la meta y arrancar el cronometro.
-        if self.finish_line is None:
-            self.finish_line = (x, y)
-            self.lap_start_time = now
-            self.total_start_time = now
-            self.get_logger().info(
-                f'Meta fijada en ({x:.2f}, {y:.2f}). Cronometro iniciado.')
-            return
-
-        dist_to_finish = np.hypot(x - self.finish_line[0],
-                                  y - self.finish_line[1])
-
-        # Armar el conteo cuando el auto se aleja claramente de la meta.
-        if not self.lap_armed:
-            if dist_to_finish > 2.0 * self.finish_line_tolerance:
-                self.lap_armed = True
-            return
-
-        # Cruce de meta: armado + dentro del circulo + vuelta plausible.
-        lap_time = (now - self.lap_start_time).nanoseconds * 1e-9
-        if dist_to_finish < self.finish_line_tolerance \
-                and lap_time > self.min_lap_time:
-            self.lap_count += 1
-            total_time = (now - self.total_start_time).nanoseconds * 1e-9
-            self.lap_start_time = now
-            self.lap_armed = False
-            self.get_logger().info(
-                '\n' + '=' * 46 + '\n'
-                f'  VUELTA {self.lap_count} COMPLETADA\n'
-                f'  Tiempo de vuelta:   {lap_time:7.2f} s\n'
-                f'  Tiempo acumulado:   {total_time:7.2f} s\n'
-                + '=' * 46)
 
     # ------------------------------------------------------------------
     # Actuacion
