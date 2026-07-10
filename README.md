@@ -339,9 +339,9 @@ Cada escenario carga su propio yaml (sección 2.4). Valores actuales:
 |---|---|---|---|
 | `max_speed` | 12.0 m/s | 10.0 m/s | Velocidad en recta |
 | `mid_speed` | 7.0 m/s | 6.5 m/s | Velocidad en curva suave |
-| `corner_speed` | 4.0 m/s | 4.0 m/s | Velocidad en curva cerrada |
-| `steering_threshold_low/high` | 10° / 20° | 10° / 17.5° | Umbrales de los 3 niveles de velocidad |
-| `brake_distance` | 2.5 m | 5.0 m | Espacio libre frontal al que se va a `corner_speed` |
+| `corner_speed` | 4.0 m/s | 3.0 m/s | Velocidad en curva cerrada |
+| `steering_threshold_low/high` | 10° / 20° | 10° / 20° | Umbrales de los 3 niveles de velocidad |
+| `brake_distance` | 2.5 m | 4.0 m | Espacio libre frontal al que se va a `corner_speed` |
 | `full_speed_distance` | 8.0 m | 8.0 m | Espacio libre frontal que permite `max_speed` |
 | `fov_angle` | 90° | 90° | Semiancho del FOV útil |
 | `smoothing_window` | 5 | 5 | Ventana de la media móvil |
@@ -369,9 +369,10 @@ Lógica del tuning de cada parte:
   libre) daba vueltas de ~67 s; la final logra **~38.7 s por vuelta** de
   forma estable y sin colisiones.
 - **Parte 2** (obstáculos): más conservador donde importa para sobrevivir al
-  zigzag: menor tope en recta (10 m/s), frenado anticipado (`brake_distance`
-  5.0) y `best_point_bias` 0.3 para apuntar algo más lejos dentro del gap y
-  suavizar la trayectoria entre paredes alternadas.
+  zigzag: menor tope en recta (10 m/s), `corner_speed` más bajo (3.0 m/s) y
+  frenado más anticipado (`brake_distance` 4.0 m) que en la Parte 1, y
+  `best_point_bias` 0.3 para apuntar algo más lejos dentro del gap y suavizar
+  la trayectoria entre paredes alternadas.
 - **Oponente** (`params_opp.yaml`): igual que la Parte 2 pero con velocidades
   reducidas (6.0 / 4.5 / 3.0 m/s): debe ser claramente más lento que el ego
   para actuar como tráfico móvil, pero conservar el mismo comportamiento
